@@ -1,10 +1,11 @@
+from services import data_handler
 from flask import Flask, render_template
-
 app = Flask(__name__, template_folder="templates")
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    league_table = data_handler.get_league_standing()
+    return render_template('index.html', league_table = league_table)
 
 @app.route("/title")
 def leagueTitle():

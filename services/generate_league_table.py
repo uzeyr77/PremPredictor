@@ -61,13 +61,24 @@ table = table.sort_values(
 print(table.index)
 # # updating the prem_table
 
-cursor.execute("DELETE FROM Prem_table_2025")
-
-for _, row in table.iterrows():
+# cursor.execute("DELETE FROM Prem_table_2025")
+create_table = """
+                
+    CREATE TABLE IF NOT EXISTS league_table_2025 (
+    team TEXT NOT NULL,
+    played INTEGER,
+    wins INTEGER,
+    draws INTEGER,
+    losses INTEGER,
+    goals_for INTEGER,
+    goals_against INTEGER,
+    points INTEGER
+    );"""
     
-    cursor.execute("""
-                   
-        INSERT INTO Prem_table_2025(team, played, wins, draws, losses, goals_for, goals_against, points)
+cursor.execute(create_table)
+for _, row in table.iterrows():
+    cursor.execute("""            
+        INSERT INTO league_table_2025(team, played, wins, draws, losses, goals_for, goals_against, points)
         VALUES (?,?,?,?,?,?,?,?)
         """,
         (
@@ -79,15 +90,9 @@ for _, row in table.iterrows():
         int(row["goals_for"]),
         int(row["goals_against"]),
         int(row["points"]),
+        )
+    
     )
-    
-     )
-    
-# sorting based on points
-table = table.sort_values(
-    by=["points", "goal_difference", "goals_for"], # sort the table by points if equal then gd, if equal then goals_for
-    ascending = False
-)
 
 conn.commit()
 conn.close()
