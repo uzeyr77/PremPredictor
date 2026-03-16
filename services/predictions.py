@@ -12,7 +12,6 @@ def predict_final_table():
     df_projected_points = get_project_final_points()
     curr_points = pd.DataFrame({'team': league_table['team'], 'points': league_table['points']})
     df_projected_table = curr_points.merge(df_projected_points)
-    # position = pd.DataFrame('team': league_table['team'], 'projected_position')
     return df_projected_table
     
    
@@ -92,8 +91,8 @@ def get_project_final_points():
     blended_ppg = get_blended_ppg()['blended_ppg']
     games_left = pd.Series(38 - league_table['played'])
     resu = pd.DataFrame({'team': league_table['team'],'projected_final_points':round(current_points + (blended_ppg * games_left))})
-    # projected_points = pd.Series(resu, name="projected_final_points")
     resu = resu.sort_values(by='projected_final_points', ascending=False)
+    resu = resu.reset_index(drop=True) # makes sure that position matches up with the projected_final_points
     resu['position'] = resu.index + 1
     return resu
 
