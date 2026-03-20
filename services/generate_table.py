@@ -3,7 +3,7 @@ import sqlite3
 #load matches
 conn = sqlite3.connect("C:/Users/uzeyr/PremierLeaguePredictor/prem_data.db")
 cursor = conn.cursor()
-matches = pd.read_sql("SELECT * FROM matches_24_25 WHERE season = 2025 AND played = 1", conn)
+matches = pd.read_sql("SELECT * FROM matches_updated WHERE season = 2025 AND played = 1", conn)
 cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
 # print(cursor.fetchall())
 # prem_data.db
@@ -61,13 +61,13 @@ table = table.sort_values(
 print(table.index)
 # # updating the prem_table
 
-cursor.execute("DELETE FROM Prem_table_2025")
+cursor.execute("DELETE FROM league_table_2025")
 
 for _, row in table.iterrows():
     
     cursor.execute("""
                    
-        INSERT INTO Prem_table_2025(team, played, wins, draws, losses, goals_for, goals_against, points)
+        INSERT INTO league_table_2025(team, played, wins, draws, losses, goals_for, goals_against, points)
         VALUES (?,?,?,?,?,?,?,?)
         """,
         (
