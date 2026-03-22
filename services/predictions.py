@@ -112,8 +112,8 @@ def predict_match(home_team:str,away_team:str):
     away_win_prob = 0
     prob = 0
     
-    for home_score in range(0, 15):
-        for away_score in range(0,15):
+    for home_score in range(0,20):
+        for away_score in range(0,20):
             prob = poisson.pmf(home_score, exp_home_goals) *  poisson.pmf(away_score, exp_away_goals)
         # calculate the probabilites for each scoreline
             if home_score > away_score:
@@ -196,7 +196,8 @@ def simulate_season(n_simulations):
         
     # Start each team with current points
     sim_points = current_points.copy()
-    print(sim_points)
+    # print(sim_points.loc['team', 'points'])
+    # print(sim_points[sim_points['team'] == 'Arsenal'])
     for _, match in remaining_fixtures.iterrows():
         home = match['home_team']
         away = match['away_team']
@@ -207,22 +208,22 @@ def simulate_season(n_simulations):
         # Award points
         
         if outcome == 'home_win':
-            sim_points[home] += 3
+            sim_points.loc[sim_points['team'] == home, 'points'] += 3
         elif outcome == 'draw':
-            sim_points[home] += 1
-            sim_points[away] += 1 
+            sim_points.loc[sim_points['team'] == home, 'points'] += 1
+            sim_points.loc[sim_points['team'] == away, 'points'] += 1 
         else:  # away_win
-            sim_points[away] += 3
+            sim_points.loc[sim_points['team'] == away, 'points'] += 3
     
     # Sort teams by points to get final table for this simulation
-    sorted_teams = sorted(sim_points.items(), key=lambda x: x[1], reverse=True)
+    sorted_teams = sim_points.sort_values(by = 'points', ascending=False)
     
     # Record outcomes
-    title_wins[sorted_teams[0][0]] += 1  # Winner
+    title_wins[sorted_teams.iloc[0]['team']] += 1  # Winner
     for i in range(4):  # Top 4
-        top_4_finishes[sorted_teams[i][0]] += 1
+        top_4_finishes[sorted_teams.iloc[i]['team']] += 1
     for i in range(-3, 0):  # Bottom 3
-        relegation_finishes[sorted_teams[i][0]] += 1
+        relegation_finishes[sorted_teams.iloc[i]['team']] += 1
     
     # Store full simulation result
     all_simulations.append(sim_points)
@@ -247,7 +248,9 @@ def main():
     # print(get_final_table())
     # print("top two race:\n", get_title_race())
     # print("top 4 race:\n", get_top_4_race())
-    print(simulate_season(10))
+    print("title probabilities", simulate_season(10000)['title_probabilities'])
+    sum1 = sum(simulate_season(10000)['top_4_probabilities'].values())
+    print(sum1)
     
     
 if __name__ == "__main__":
