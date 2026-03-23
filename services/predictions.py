@@ -185,53 +185,52 @@ def simulate_season(n_simulations):
     top_4_finishes = {team: 0 for team in league_table['team']}
     relegation_finishes = {team: 0 for team in league_table['team']}
     all_simulations = []
-
-# Get current points and remaining fixtures
-    current_points = league_table[['team', 'points']]  # {team: points}
+    
+    current_points = league_table[['team', 'points']].set_index('team')
     remaining_fixtures = predict_all_remaining_matches()
-    # simulate of remaining season
+    
     for sim in range(n_simulations):
+        sim_points = current_points.copy()
         if sim % 1000 == 0:
             print(f"Simulation {sim}/{n_simulations}")
-        
-    # Start each team with current points
-    sim_points = current_points.copy()
-    # print(sim_points.loc['team', 'points'])
-    # print(sim_points[sim_points['team'] == 'Arsenal'])
-    for _, match in remaining_fixtures.iterrows():
-        home = match['home_team']
-        away = match['away_team']
-        probs = [match['home_win_prob'], match['draw_prob'], match['away_win_prob']]
-        
-        # Randomly sample outcome based on probabilities
-        outcome = np.random.choice(['home_win', 'draw', 'away_win'], p=probs)
-        # Award points
-        
-        if outcome == 'home_win':
-            sim_points.loc[sim_points['team'] == home, 'points'] += 3
-        elif outcome == 'draw':
-            sim_points.loc[sim_points['team'] == home, 'points'] += 1
-            sim_points.loc[sim_points['team'] == away, 'points'] += 1 
-        else:  # away_win
-            sim_points.loc[sim_points['team'] == away, 'points'] += 3
     
+        for _, match in remaining_fixtures.iterrows():
+            home = match['home_team']
+            away = match['away_team']
+            probs = [match['home_win_prob'], match['draw_prob'], match['away_win_prob']]
+            # print(f"{home} vs {away}: prob: {probs}\n")
+            # Randomly sample outcome based on probabilities
+            outcome = np.random.choice(['home_win', 'draw', 'away_win'], p=probs)
+            # print(f"{outcome}\n")
+            # Award points
+            
+            if outcome == 'home_win':
+                sim_points.at[home, 'points'] += 3
+                # print(f"home win : {sim_points.at[home, 'points']}")
+            elif outcome == 'draw':
+                sim_points.at[home, 'points']+= 1
+                sim_points.at[away, 'points'] += 1
+                # print(f"draw: {sim_points.at[home, 'points']}")
+            else:  # away_win
+                sim_points.at[away, 'points'] += 3
+                # print(f"home loss: {sim_points.at[home, 'points']}")
+        
     # Sort teams by points to get final table for this simulation
-    sorted_teams = sim_points.sort_values(by = 'points', ascending=False)
-    
-    # Record outcomes
-    title_wins[sorted_teams.iloc[0]['team']] += 1  # Winner
-    for i in range(4):  # Top 4
-        top_4_finishes[sorted_teams.iloc[i]['team']] += 1
-    for i in range(-3, 0):  # Bottom 3
-        relegation_finishes[sorted_teams.iloc[i]['team']] += 1
-    
-    # Store full simulation result
-    all_simulations.append(sim_points)
-
-    # Convert counts to probabilities
-    title_probs = {team: wins/n_simulations for team, wins in title_wins.items()}
-    top_4_probs = {team: finishes/n_simulations for team, finishes in top_4_finishes.items()}
-    relegation_probs = {team: finishes/n_simulations for team, finishes in relegation_finishes.items()}
+        sorted_teams = sim_points.sort_values(by = 'points', ascending=False)
+        
+        # Record outcomes
+        title_wins[sorted_teams.index[0]] += 1  # Winner
+        for i in range(4):  # Top 4
+            top_4_finishes[sorted_teams.index[i]] += 1
+        for i in range(-3, 0):  # Bottom 3
+            relegation_finishes[sorted_teams.index[i]] += 1
+        
+        # Store full simulation result
+        all_simulations.append(sim_points.copy())
+        # Convert counts to probabilities
+        title_probs = {team: wins/n_simulations for team, wins in title_wins.items()}
+        top_4_probs = {team: finishes/n_simulations for team, finishes in top_4_finishes.items()}
+        relegation_probs = {team: finishes/n_simulations for team, finishes in relegation_finishes.items()}
 
     return {
         'title_probabilities': title_probs,
@@ -248,9 +247,8 @@ def main():
     # print(get_final_table())
     # print("top two race:\n", get_title_race())
     # print("top 4 race:\n", get_top_4_race())
-    print("title probabilities", simulate_season(10000)['title_probabilities'])
-    sum1 = sum(simulate_season(10000)['top_4_probabilities'].values())
-    print(sum1)
+    result = simulate_season(1000)
+    print("TITLE race: ", result['top_4_probabilities']) 
     
     
 if __name__ == "__main__":
