@@ -185,15 +185,17 @@ def simulate_season(n_simulations):
     top_4_finishes = {team: 0 for team in league_table['team']}
     relegation_finishes = {team: 0 for team in league_table['team']}
     all_simulations = []
-    
+
     current_points = league_table[['team', 'points']].set_index('team')
     remaining_fixtures = predict_all_remaining_matches()
-    
+    teams = league_table['team'].tolist()
+    all_values = {team: [] for team in teams}
+    # print(current_points)
     for sim in range(n_simulations):
         sim_points = current_points.copy()
         if sim % 1000 == 0:
             print(f"Simulation {sim}/{n_simulations}")
-    
+
         for _, match in remaining_fixtures.iterrows():
             home = match['home_team']
             away = match['away_team']
@@ -203,7 +205,7 @@ def simulate_season(n_simulations):
             outcome = np.random.choice(['home_win', 'draw', 'away_win'], p=probs)
             # print(f"{outcome}\n")
             # Award points
-            
+
             if outcome == 'home_win':
                 sim_points.at[home, 'points'] += 3
                 # print(f"home win : {sim_points.at[home, 'points']}")
@@ -214,42 +216,196 @@ def simulate_season(n_simulations):
             else:  # away_win
                 sim_points.at[away, 'points'] += 3
                 # print(f"home loss: {sim_points.at[home, 'points']}")
-        
+
     # Sort teams by points to get final table for this simulation
         sorted_teams = sim_points.sort_values(by = 'points', ascending=False)
-        
+
         # Record outcomes
         title_wins[sorted_teams.index[0]] += 1  # Winner
         for i in range(4):  # Top 4
             top_4_finishes[sorted_teams.index[i]] += 1
         for i in range(-3, 0):  # Bottom 3
             relegation_finishes[sorted_teams.index[i]] += 1
-        
-        # Store full simulation result
+
+        # get every tally of points for each sim and store in array
+        for team, row in sim_points.iterrows():
+            points = row['points']
+            all_values[team].append(int(points))
+
         all_simulations.append(sim_points.copy())
-        # Convert counts to probabilities
         title_probs = {team: wins/n_simulations for team, wins in title_wins.items()}
         top_4_probs = {team: finishes/n_simulations for team, finishes in top_4_finishes.items()}
         relegation_probs = {team: finishes/n_simulations for team, finishes in relegation_finishes.items()}
-
     return {
         'title_probabilities': title_probs,
         'top_4_probabilities': top_4_probs,
         'relegation_probabilities': relegation_probs,
-        'all_simulations': all_simulations
+        'all_simulations': all_simulations,
+        'all_values': all_values
+    }
+# monte carlo simulation for the scenario based simulation
+def simulate_season_scenario(fixtures, n_simulations):
+    title_wins = {team: 0 for team in league_table['team']}
+    top_4_finishes = {team: 0 for team in league_table['team']}
+    relegation_finishes = {team: 0 for team in league_table['team']}
+    all_simulations = []
+
+    current_points = league_table[['team', 'points']].set_index('team')
+    remaining_fixtures = fixtures
+    teams = league_table['team'].tolist()
+    all_values = {team: [] for team in teams}
+    # print(current_points)
+    for sim in range(n_simulations):
+        sim_points = current_points.copy()
+        if sim % 1000 == 0:
+            print(f"Simulation {sim}/{n_simulations}")
+
+        for _, match in remaining_fixtures.iterrows():
+            home = match['home_team']
+            away = match['away_team']
+            probs = [match['home_win_prob'], match['draw_prob'], match['away_win_prob']]
+            # print(f"{home} vs {away}: prob: {probs}\n")
+            # Randomly sample outcome based on probabilities
+            outcome = np.random.choice(['home_win', 'draw', 'away_win'], p=probs)
+            # print(f"{outcome}\n")
+            # Award points
+
+            if outcome == 'home_win':
+                sim_points.at[home, 'points'] += 3
+                # print(f"home win : {sim_points.at[home, 'points']}")
+            elif outcome == 'draw':
+                sim_points.at[home, 'points']+= 1
+                sim_points.at[away, 'points'] += 1
+                # print(f"draw: {sim_points.at[home, 'points']}")
+            else:  # away_win
+                sim_points.at[away, 'points'] += 3
+                # print(f"home loss: {sim_points.at[home, 'points']}")
+
+    # Sort teams by points to get final table for this simulation
+        sorted_teams = sim_points.sort_values(by = 'points', ascending=False)
+
+        # Record outcomes
+        title_wins[sorted_teams.index[0]] += 1  # Winner
+        for i in range(4):  # Top 4
+            top_4_finishes[sorted_teams.index[i]] += 1
+        for i in range(-3, 0):  # Bottom 3
+            relegation_finishes[sorted_teams.index[i]] += 1
+
+        # get every tally of points for each sim and store in array
+        for team, row in sim_points.iterrows():
+            points = row['points']
+            all_values[team].append(int(points))
+
+        all_simulations.append(sim_points.copy())
+        title_probs = {team: wins/n_simulations for team, wins in title_wins.items()}
+        top_4_probs = {team: finishes/n_simulations for team, finishes in top_4_finishes.items()}
+        relegation_probs = {team: finishes/n_simulations for team, finishes in relegation_finishes.items()}
+    return {
+        'title_probabilities': title_probs,
+        'top_4_probabilities': top_4_probs,
+        'relegation_probabilities': relegation_probs,
+        'all_simulations': all_simulations,
+        'all_values': all_values
     }
 
-    
+
+
+def get_points_distribution(team, all_simulations):
+
+    #  extract all final points for this team
+    points_distribution = all_simulations['all_values'][team]
+    return {
+        'min': min(points_distribution),
+        'max': max(points_distribution),
+        'median': np.median(points_distribution),
+        'p5': np.percentile(points_distribution,5),
+        'p95': np.percentile(points_distribution, 95),
+        'all_values': points_distribution
+    }
+
+
+def simulate_scenario(fixture_overrides, n_simulations=5000):
+    """
+    Simulate season with user-specified results
+
+    Args:
+        fixture_overrides (list): [
+            {'home': 'Arsenal', 'away': 'Liverpool', 'result': 'home_win'},
+            {'home': 'Man City', 'away': 'Chelsea', 'result': 'draw'}
+        ]
+        n_simulations (int): Number of simulations (fewer for speed)
+
+    Returns:
+        dict: Same format as simulate_season()
+    """
+    '''  
+         so user specifies some fixture outcomes e.i city beats leeds to get 3 points, then simulating this scenario will return
+         what the outcome of that win was (e.i does it push city to win the league). Will be based of current points
+    '''
+    current_points = league_table
+
+    for override in fixture_overrides:
+        home_team = override['home']
+        away_team = override['away']
+        outcome = override['result']
+
+        if outcome == 'home_win':
+            current_points[home_team] += 3
+        elif outcome == 'away_win':
+            current_points[away_team] += 3
+        else:
+            current_points[home_team] += 1
+            current_points[away_team] += 1
+
+    # predict the rest of the fixtures not including the ones overridden
+    all_fixtures = predict_all_remaining_matches()
+
+    # create a set of the fixtures to override from the fixture_overrides passed
+    # e.i before: [ {'home': man city, 'away': arsenal}, {...}, and so on change to --> set {(arsenal, man city), (..,..), ..}
+    # this provides faster look up time
+    override_set = {(f['home'], f['away']) for f in fixture_overrides}
+
+    # filtering by checking if the fixture is in fixture_override
+    remaining_fixtures = all_fixtures[
+        # run a function row by row: for each row x in the dataframe all_fixtures if the tuple (home_team, away_team)
+        # is in the overrided set put True else put False, .apply() returns a series of [True, False, False, ... ]
+        # the ~ negates it so if a fixture is overridden it becomes false else it becomes true
+        # so this only keeps the fixtures that have not been overridden assigned to remaining_fixtures
+        ~all_fixtures.apply(lambda x: (x['home_team'], x['away_team']) in override_set, axis = 1)
+    ]
+
+
+def compare_scenario():
+    """
+        Compare baseline predictions to scenario predictions
+
+        Returns:
+            DataFrame with columns:
+            - team
+            - baseline_title_prob
+            - scenario_title_prob
+            - title_prob_change
+            - baseline_top4_prob
+            - scenario_top4_prob
+            - top4_prob_change
+        """
+    baseline = simulate_season()
+
+
+
+
+
+
+
     
 def main():
-    # actual_ppg = get_actual_ppg()
-    # expected_ppg = get_expected_ppg()
-    # print(get_final_table())
-    # print("top two race:\n", get_title_race())
-    # print("top 4 race:\n", get_top_4_race())
-    result = simulate_season(1000)
-    print("TITLE race: ", result['top_4_probabilities']) 
-    
+    p = get_points_distribution("Man City", simulate_season(10000))['median']
+    print(p)
+    # assert abs(sum(result['title_probabilities'].values()) - 1.0) < 0.01
+    # r = get_points_distribution('Arsenal', result)
+
+
+
     
 if __name__ == "__main__":
     main()
