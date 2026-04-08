@@ -2,6 +2,7 @@ import pandas as pd
 from flask import Flask, render_template
 import sqlite3
 import numpy as np
+from pandas.core.interchange.dataframe_protocol import DataFrame
 from scipy import stats
 from scipy.stats import poisson
 conn = sqlite3.connect("C:/Users/uzeyr/PremierLeaguePredictor/prem_data.db")
@@ -28,7 +29,7 @@ def get_top_4_race():
 def get_title_race():
     final_table = get_final_table()
     
-    return final_table.head(2) 
+    return final_table.head(2)
     
 # helper functions
 def get_actual_ppg():
@@ -243,7 +244,7 @@ def simulate_season(n_simulations):
         'all_simulations': all_simulations,
         'all_values': all_values
     }
-# monte carlo simulation for the scenario based simulation
+# monte carlo simulation for the scenario based simulation, helper function, will not be called directly
 def simulate_season_scenario(fixtures, n_simulations):
     title_wins = {team: 0 for team in league_table['team']}
     top_4_finishes = {team: 0 for team in league_table['team']}
@@ -254,7 +255,7 @@ def simulate_season_scenario(fixtures, n_simulations):
     remaining_fixtures = fixtures
     teams = league_table['team'].tolist()
     all_values = {team: [] for team in teams}
-    # print(current_points)
+
     for sim in range(n_simulations):
         sim_points = current_points.copy()
         if sim % 1000 == 0:
@@ -324,7 +325,7 @@ def get_points_distribution(team, all_simulations):
     }
 
 
-def simulate_scenario(fixture_overrides, n_simulations=5000):
+def simulate_scenario(fixture_overrides: list[dict], n_simulations=5000):
     """
     Simulate season with user-specified results
 
@@ -342,7 +343,13 @@ def simulate_scenario(fixture_overrides, n_simulations=5000):
          so user specifies some fixture outcomes e.i city beats leeds to get 3 points, then simulating this scenario will return
          what the outcome of that win was (e.i does it push city to win the league). Will be based of current points
     '''
-    current_points = league_table
+
+    # check if the fixtures given have already happened by looking through the matches dataframe
+    all_remaining_matches = matches[matches['played'] == 0]
+    all_remaining_matches = all_remaining_matches[["home_team", "away_team"]]
+
+    # makes it so current points is a df that has 2 columns only, namly team name and points and the index is team
+    current_points = league_table[['team', 'points']].set_index('team')
 
     for override in fixture_overrides:
         home_team = override['home']
@@ -350,12 +357,12 @@ def simulate_scenario(fixture_overrides, n_simulations=5000):
         outcome = override['result']
 
         if outcome == 'home_win':
-            current_points[home_team] += 3
+            current_points.at[home_team, 'points'] += 3
         elif outcome == 'away_win':
-            current_points[away_team] += 3
+            current_points.at[away_team, 'points'] += 3
         else:
-            current_points[home_team] += 1
-            current_points[away_team] += 1
+            current_points.at[home_team, 'points'] += 1
+            current_points.at[away_team, 'points'] += 1
 
     # predict the rest of the fixtures not including the ones overridden
     all_fixtures = predict_all_remaining_matches()
@@ -364,6 +371,10 @@ def simulate_scenario(fixture_overrides, n_simulations=5000):
     # e.i before: [ {'home': man city, 'away': arsenal}, {...}, and so on change to --> set {(arsenal, man city), (..,..), ..}
     # this provides faster look up time
     override_set = {(f['home'], f['away']) for f in fixture_overrides}
+    for home, away in override_set:
+        exists =  ((all_remaining_matches['home_team'] == home) & (all_remaining_matches['away_team'] == away)).any()
+        if not exists:
+            raise ValueError("Fixture list contains match that already happened, cannot predict given scenario")
 
     # filtering by checking if the fixture is in fixture_override
     remaining_fixtures = all_fixtures[
@@ -375,35 +386,62 @@ def simulate_scenario(fixture_overrides, n_simulations=5000):
     ]
 
 
-def compare_scenario():
-    """
-        Compare baseline predictions to scenario predictions
+    # simualte season with the remaining fixtures (not including the first outcomes) default is 10_000 runs
+    return simulate_season_scenario(remaining_fixtures, n_simulations)
 
-        Returns:
-            DataFrame with columns:
-            - team
-            - baseline_title_prob
-            - scenario_title_prob
-            - title_prob_change
-            - baseline_top4_prob
-            - scenario_top4_prob
-            - top4_prob_change
-        """
-    baseline = simulate_season()
+def compare_scenario(baseline_results: dict, scenario_results: dict, metric: str) -> DataFrame:
+    # compare baseline Vs scenario prediction results
+    # return is based on metric e.i title, top4, relegation etc
+    # returns a df sorted by biggest probability change
 
+    # raise exception if metric is invalid, if dicts are missing info
 
+    # map the metric given to the corresponding probability
+    metric_map =  {
+        "title": "title_probabilities",
+        "top_4": "top_4_probabilities",
+        "relegation": "relegation_probabilities"
+    }
 
+    # get the probability dict based on the metric
+    prob_key = metric_map[metric]
+    baseline_probs = baseline_results[prob_key]
+    scenario_probs = scenario_results[prob_key]
 
+    # build dataframe for comp
+    comparison = []
+
+    for team in baseline_probs.keys():
+        baseline_prob = baseline_probs[team]
+        scenario_prob = scenario_probs[team]
+        change = scenario_probs - baseline_prob
+
+        comparison.append(
+            {
+                'team': team,
+                'baseline_prob': baseline_prob,
+                'scenario_prob': scenario_prob,
+                'change': change,
+                "change_pct": change * 100
+            }
+
+        )
+
+        df_result = pd.DataFrame(comparison)
+        df_result['abs_change'] = abs(df_result['change'])
+        df_result.sort_values(df_result['abs_change'], ascending= False).drop('abs_change', axis = 1)
+        df_result.reset_index(drop = True)
+
+        return df_result
 
 
 
     
 def main():
-    p = get_points_distribution("Man City", simulate_season(10000))['median']
-    print(p)
-    # assert abs(sum(result['title_probabilities'].values()) - 1.0) < 0.01
-    # r = get_points_distribution('Arsenal', result)
-
+    fixture_overrides =  [
+        {'home': 'Wolves', 'away': 'Arsenal', 'result': 'loss'},
+    ]
+    print("after:",simulate_scenario(fixture_overrides, 10)['title_probabilities'])
 
 
     
