@@ -219,3 +219,5 @@ services/generate_league_table.py
 services/generate_table.py
 static/css/style.css
 static/js
+app.py
+prem_data.db
