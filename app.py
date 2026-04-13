@@ -3,21 +3,50 @@ from flask import Flask, render_template
 app = Flask(__name__, template_folder="templates")
 
 @app.route('/')
-def home():
-    league_table = data_handler.get_league_standing()
-    return render_template('index.html', league_table = league_table)
+def index():
+    """
+    landing page:
+    should display all the information
+    - league table
+    - top 4 specifically
+    - title race
+    - relegation battle
+    - golden boot (maybe)
+    """
 
-@app.route("/title")
-def leagueTitle():
-    return "title route"
+    return render_template('index.html')
 
-@app.route('/top4')
-def name(name):
-    return "top4 route"
+@app.route("/predictions")
+def predictions():
+    """
+    should display predictions:
+    - title race
+    - top 4
+    - who gets relagated
+    - who wins golden boot
+    etc
+    """
+    return render_template('predictions.html')
 
-@app.route('/table')
-def wagwan(greet):
-    return "table render"
+@app.route('/scenario')
+def scenario():
+
+    '''
+    user can introduce some scenarios and then predictions will be made based on that match outcome
+    e.i arsenal beating chelsea and city lossing against leeds
+    Returns:
+
+    '''
+    return render_template('scenario.html')
+
+@app.route('/golden_boot')
+def golden_boot():
+    """
+    golden boot predicitions
+    Returns:
+
+    """
+    return render_template('goldenboot.html')
 
 
 if __name__ == "__main__":

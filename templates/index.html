@@ -1,45 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <title>PremPredictor App</title>
-</head>
-<body>
-    <h1>Welcome to prempredictor</h1>
-        <table>
-            <thead>
-                <!-- header row -->
-                 <tr>
-                    <!-- header row column names -->
-                     <th>team</th>
-                     <th>played</th>
-                     <th>wins</th>
-                     <th>draws</th>
-                     <th>losses</th>
-                     <th>goals_for</th>
-                     <th>goals_against</th>
-                     <th>points</th>
-                 </tr>
-            </thead>
+{% extends "base.html" %}
 
-            <tbody>
-                <!-- body of the table -->
-                 {% for team in league_table%}
-                 <tr>
-                    <td>{{ team.team}}</td>
-                    <td>{{ team.played}}</td>
-                    <td>{{ team.wins}}</td>
-                    <td>{{ team.draws}}</td>
-                    <td>{{ team.losses}}</td>
-                    <td>{{ team.goals_for}}</td>
-                    <td>{{ team.goals_against}}</td>
-                    <td>{{ team.points}}</td>
-                 </tr>
-                 {% endfor %}
-            </tbody>
-           
-        </table>
-</body>
-</html>
+{% block title %}Home page{% endblock %}
+
+
+
+{% block content %}
+    <h1>Welcome to the Home Page</h1>
+{% endblock %}
