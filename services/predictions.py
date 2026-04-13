@@ -13,6 +13,7 @@ HOME_ADVANTAGE = 1.3
 LEAGUE_AVERAGE_GOALS = 1.4
 # main predicition algorithm
 def get_final_table():
+    '''Returns the final table after the end of the season based on projected final points'''
     df_projected_points = get_project_final_points()
     curr_points = pd.DataFrame({'team': league_table['team'], 'points': league_table['points']})
     df_projected_table = curr_points.merge(df_projected_points)
@@ -21,34 +22,45 @@ def get_final_table():
    
 # wrapper to return the top 4 from predicitions
 def get_top_4_race():
+    '''returns the top 4 teams, live as it is no predicition'''
     final_table = get_final_table()
     
     return final_table.head(4)
 
 # wrapper to return the top 2 favourities from predicitions
 def get_title_race():
+    '''returns a  the top 2 teams of the table'''
     final_table = get_final_table()
     
     return final_table.head(2)
     
 # helper functions
 def get_actual_ppg():
+    '''returns a dataframe that has each team and their ppg'''
     ppg = pd.DataFrame({'team': league_table["team"], 'actual_ppg': league_table["points"] / league_table["played"]})
     return ppg
 
 def get_expected_ppg():
+    '''returns a dataframe for the expected points per game based on attack/defense strength'''
     df_goal_difference = get_goal_difference()
     df_expected_ppg = goal_difference_to_expected_ppg(df_goal_difference)
     
     return df_expected_ppg
 
 def get_goal_difference():
+    '''Leage average for goals scored and conceded is also 1.4, returns a dataframe for the goal differene of each team
+    goal difference for any team is calculated by attack_strength * league_avg - defense_strength * league_avg'''
      # league average for goals scored and conceded is 1.4
     # goal difference is attack strng * leage avg - defense strng * league avg
     df_goal_difference = pd.DataFrame({'team': team_statistics["team"], 'goal_difference': team_statistics['attack_strength'] * 1.4 - team_statistics['defense_strength'] * 1.4})
     return df_goal_difference 
 
-def goal_difference_to_expected_ppg(df_goal_difference):    
+def goal_difference_to_expected_ppg(df_goal_difference):
+    '''args: dataframe representing the goal difference of each tean
+       takes the goal difference of each team and maps it to a expected points per game
+       the higher the goal difference the greater the ppg
+       e.i a team with higher goal difference will have a higher expected ppg against a team with a lower goal difference
+       return: dataframe that represents each teams expected ppg'''
     def map_to_ppg(goal_diff):
         if goal_diff >= 1.0:
           return 2.5
@@ -69,6 +81,8 @@ def goal_difference_to_expected_ppg(df_goal_difference):
     df_expected_ppg = pd.DataFrame({'team': df_goal_difference['team'].values, 'expected_ppg': df_goal_difference['goal_difference'].apply(map_to_ppg)})
     return df_expected_ppg
 
+
+
 def get_combined_ppg():
     blended_ppg = get_blended_ppg()
     actual_ppg = get_actual_ppg()
@@ -79,6 +93,10 @@ def get_combined_ppg():
     
 def get_blended_ppg():
     # blended ppg formula: actual_ppg * .70 + expected_ppg * .30
+    '''
+    Returns: a dataframe that has the details for every teams expected ppg and blended ppg
+
+    '''
     actual_ppg = get_actual_ppg()
     expected_ppg = get_expected_ppg()
     blended_ppg = actual_ppg['actual_ppg'].values* .70 + expected_ppg['expected_ppg'].values * .30
@@ -88,6 +106,12 @@ def get_blended_ppg():
 
 def get_project_final_points():
     # projected final points = current_points + (blended_ppg * games remaining)
+
+    '''
+
+    Returns: a dataframe with projected league table based on the current points from games played and a ppg based on teams performance this season
+
+    '''
     current_points = pd.Series(league_table['points'])
     blended_ppg = get_blended_ppg()['blended_ppg']
     games_left = pd.Series(38 - league_table['played'])
@@ -102,6 +126,24 @@ def predict_match(home_team:str,away_team:str):
     #  expected goals are the lambda values for each team
     #  poisson.pmf(k, Lambda) k represents the number of events (goals) and lambda is expected
     #  poisson.pmf(2, 1.6) is the probability of scoring EXACTLY 2 goals when the expected is 1.6
+
+    '''
+    poisson.pmf(k, lambda): k represents the number of occurances for some event, and lambda is expected(mean) number of occurances
+    so it returns the probability of that event happening k times
+    Args:
+        home_team: the home team of a match
+        away_team: the away team of a match
+
+    Returns: a dataframe that contains the data for the probability of each outcome
+    - home_win prob
+    - away_win prob
+    - draw_prob
+    as well as
+    - exp_home_goals
+    - exp_away_goals
+    for each match
+
+    '''
     home_attack =  team_statistics.loc[team_statistics['team'] == home_team, 'attack_strength'].values[0]
     home_defense = team_statistics.loc[team_statistics['team'] == home_team, 'defense_strength'].values[0] 
     away_attack =  team_statistics.loc[team_statistics['team'] == away_team, 'attack_strength'].values[0] 
@@ -182,6 +224,20 @@ def predict_all_remaining_matches():
         
 
 def simulate_season(n_simulations):
+    '''
+   simulates the season for n iterations (monte carlo sim)
+    Args:
+        n_simulations: an integer for number of simulations to run
+
+    Returns: {
+         'title_probabilities': title_probs,
+        'top_4_probabilities': top_4_probs,
+        'relegation_probabilities': relegation_probs,
+        'all_simulations': all_simulations,
+        'all_values': all_values
+        }
+
+    '''
     title_wins = {team: 0 for team in league_table['team']}
     top_4_finishes = {team: 0 for team in league_table['team']}
     relegation_finishes = {team: 0 for team in league_table['team']}
@@ -246,6 +302,28 @@ def simulate_season(n_simulations):
     }
 # monte carlo simulation for the scenario based simulation, helper function, will not be called directly
 def simulate_season_scenario(fixtures, n_simulations):
+    '''
+      simulates the season for n iterations (monte carlo sim) but based on specific scenario(s)
+    Args:
+        n_simulations: an integer for number of simulations to run
+        fixtures: an array containing scenarios for matches that have yet to occur
+        of the form:
+        fixtures =
+        {
+            ["home_team": some_team, "away_team": some_team, "outcome": win | draw | loss]
+        }
+
+    Returns: the predicted final table if that scenario was to occur
+
+     {
+         'title_probabilities': title_probs,
+        'top_4_probabilities': top_4_probs,
+        'relegation_probabilities': relegation_probs,
+        'all_simulations': all_simulations,
+        'all_values': all_values
+        }
+
+    '''
     title_wins = {team: 0 for team in league_table['team']}
     top_4_finishes = {team: 0 for team in league_table['team']}
     relegation_finishes = {team: 0 for team in league_table['team']}
@@ -311,9 +389,25 @@ def simulate_season_scenario(fixtures, n_simulations):
 
 
 
-def get_points_distribution(team, all_simulations):
+def get_points_distribution(team:str, all_simulations):
 
-    #  extract all final points for this team
+    '''
+    Get points distribution of the final points for a specific team
+
+    Args:
+        team: some team in the pr
+        all_simulations: dataframe containing outcomes of the monte carlo sim
+
+    Returns:   dict: {
+            'min': 75,
+            'max': 95,
+            'median': 85,
+            'p5': 78,   # 5th percentile
+            'p95': 91,  # 95th percentile
+            'all_values': [85, 86, 83, ...]  # For histogram
+        }
+
+    '''
     points_distribution = all_simulations['all_values'][team]
     return {
         'min': min(points_distribution),
@@ -438,10 +532,7 @@ def compare_scenario(baseline_results: dict, scenario_results: dict, metric: str
 
     
 def main():
-    fixture_overrides =  [
-        {'home': 'Wolves', 'away': 'Arsenal', 'result': 'loss'},
-    ]
-    print("after:",simulate_scenario(fixture_overrides, 10)['title_probabilities'])
+    print(predict_match("Man City", "Arsenal"))
 
 
     

@@ -3,29 +3,32 @@ import sqlite3
 #load matches
 conn = sqlite3.connect("C:/Users/uzeyr/PremierLeaguePredictor/prem_data.db")
 cursor = conn.cursor()
-matches = pd.read_sql("SELECT * FROM matches_24_25 WHERE season = 2025 AND played = 1", conn)
+matches = pd.read_sql("SELECT * FROM match_data WHERE season = 2025 AND played = 1", conn)
 cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
 # print(cursor.fetchall())
 # prem_data.db
-matches = matches.dropna(subset=["home_goals", "away_goals"])
 
+matches = matches.dropna(subset=["home_goals", "away_goals"]) # not needed because the sql query only selects games where played column has a 1
+
+print(matches)
+#
 # type check (make sure they are integers)
 matches["home_goals"] = matches["home_goals"].astype(int)
 matches["away_goals"] = matches["away_goals"].astype(int)
 matches["played"] = matches["played"].astype(int)
 # print(matches.dtypes)
 matches["home_wins"] = matches["home_goals"] > matches["away_goals"]
-matches["home_draws"] = matches["home_goals"] == matches["away_goals"] 
+matches["home_draws"] = matches["home_goals"] == matches["away_goals"]
 
 matches["away_wins"] = matches["away_goals"] > matches["home_goals"]
-matches["away_draws"] = matches["away_goals"] == matches["home_goals"] 
-# home stats 
+matches["away_draws"] = matches["away_goals"] == matches["home_goals"]
+# home stats
 home_stats = matches.groupby("home_team").agg(
     home_played = ("home_team", "count"),
     home_wins = ("home_wins", "sum"),
     home_draws = ("home_draws", "sum"),
     home_goals_for = ("home_goals", "sum"),
-    home_goals_against = ("away_goals", "sum")    
+    home_goals_against = ("away_goals", "sum")
 )
 
 
@@ -61,9 +64,9 @@ table = table.sort_values(
 print(table.index)
 # # updating the prem_table
 
-# cursor.execute("DELETE FROM Prem_table_2025")
+cursor.execute("DELETE FROM league_table_2025")
 create_table = """
-                
+
     CREATE TABLE IF NOT EXISTS league_table_2025 (
     team TEXT NOT NULL,
     played INTEGER,
@@ -74,10 +77,10 @@ create_table = """
     goals_against INTEGER,
     points INTEGER
     );"""
-    
+
 cursor.execute(create_table)
 for _, row in table.iterrows():
-    cursor.execute("""            
+    cursor.execute("""
         INSERT INTO league_table_2025(team, played, wins, draws, losses, goals_for, goals_against, points)
         VALUES (?,?,?,?,?,?,?,?)
         """,
@@ -91,9 +94,10 @@ for _, row in table.iterrows():
         int(row["goals_against"]),
         int(row["points"]),
         )
-    
-    )
 
+    )
+# table = table.reset_index(drop=True)
+# table['position'] = table.index + 1
 conn.commit()
 conn.close()
 print("update was successful")
