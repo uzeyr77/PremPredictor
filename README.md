@@ -4,240 +4,93 @@ A statistical modeling tool that predicts Premier League outcomes using Poisson-
 
 Built to apply probability, data analysis, and simulation to something real: football.
 
----
-
 ## Overview
 
-The league table shows what has happened. This project focuses on what is likely to happen next.
+The league table shows what has happened — this project focuses on what's likely to happen next.
 
 Using two seasons of Premier League data stored in SQLite, the model:
 
-* Estimates expected goals from team attack and defense strength
-* Simulates thousands of matches and full seasons
-* Outputs probabilities for titles, top-4 finishes, and relegation
+- Estimates expected goals from team attack/defense strength
+- Simulates thousands of matches and full seasons
+- Outputs probabilities for titles, top-4 finishes, and relegation
 
-It also supports match predictions and scenario analysis through a conversational CLI.
-
----
+It also supports match-level predictions and scenario analysis, all accessible through a conversational CLI.
 
 ## Key Features
 
-**Match Prediction**
-Poisson-based goal modeling that produces win, draw, and loss probabilities.
+**Match Prediction** — Poisson-based goal modeling producing win/draw/loss probabilities.
 
-**Monte Carlo Simulation**
-10,000+ simulated seasons to generate outcome distributions.
+**Monte Carlo Simulation** — 10,000+ simulated seasons generating outcome distributions.
 
-**Projected Table**
-Blended points-per-game model (70% actual, 30% expected).
+**Projected Table** — Blended PPG model (70% actual, 30% expected) extrapolated over remaining fixtures.
 
-**Scenario Analysis**
-Lock in specific results and re-simulate the season.
+**Scenario Analysis** — Lock in specific results and re-simulate the season.
 
-**Conversational CLI**
-Ask questions naturally with fuzzy team name matching. No memorizing commands.
+**Conversational CLI** — Ask questions naturally with fuzzy team name matching. No memorizing commands.
 
-**Team Insights**
-Current form, projected points, and probability breakdowns.
-
----
+**Team Insights** — Current form, projected points, and probability breakdowns.
 
 ## How It Works
 
-* Load match and team data from SQLite into pandas
-* Compute expected goals using attack and defense ratings
-* Model scoreline probabilities using a Poisson distribution
-* Resolve remaining fixtures with weighted random sampling
-* Aggregate points into a final table
-* Repeat thousands of times to build probability distributions
-
----
+1. Match and team data is read from SQLite into pandas DataFrames
+2. Expected goals are computed using attack/defense strength ratings
+3. Poisson distribution models the probability of every possible scoreline
+4. Remaining fixtures are resolved via weighted random sampling
+5. Points are tallied across all 20 teams into a final table
+6. Repeat thousands of times to build probability distributions
 
 ## The CLI
 
-This is not a traditional command-line tool. It understands natural language and responds conversationally.
-
-### Example Usage
-
-<img width="1783" height="336" alt="image" src="https://github.com/user-attachments/assets/4876b4ff-76d8-42b8-86f9-329b52d272b9" />
-
-<img width="1797" height="632" alt="image" src="https://github.com/user-attachments/assets/70da39e1-cb29-49a0-9c99-eebf75ec8829" />
-
-<img width="1780" height="741" alt="image" src="https://github.com/user-attachments/assets/46465049-d568-4bdd-96dc-5cc16b50a01f" />
-
-<img width="1799" height="425" alt="image" src="https://github.com/user-attachments/assets/a585285a-d2f4-4849-b84d-0f5559449ce5" />
-
-<img width="1798" height="771" alt="image" src="https://github.com/user-attachments/assets/54b3d38d-89b3-48d0-b3d7-5f52492df619" />
-
-
-
-### What Makes It Different
-
-Traditional CLI tools require exact commands and strict syntax. This CLI allows free-form input and interprets user intent automatically.
-
----
-
-## How the CLI Works
-
-### 1. Intent Recognition
-
-The system analyzes the user's input and determines what they want.
-
-Example:
-
-* Input: "what are arsenal's chances of winning the title?"
-* Intent: title race
-* Extracted team: Arsenal
-
-### 2. Entity Extraction
-
-The CLI automatically extracts useful information from text:
-
-* Team names
-* Number of simulations
-* Match pairings
-
-Example:
-
-* Input: "predict arsenal vs liverpool with 5000 simulations"
-* Teams: Arsenal, Liverpool
-* Simulations: 5000
-
-### 3. Fuzzy Matching
-
-Handles typos and partial names:
-
-* "ars" → Arsenal
-* "mancity" → Man City
-* "liverpol" → Liverpool
-
-### 4. Context-Aware Responses
-
-If information is missing, the CLI asks follow-up questions instead of failing.
-
-Example:
+This isn't a traditional command-line tool with rigid syntax. It understands natural language:
 
 ```
-You > predict a match
-
-I need two teams to continue.
-Home team: Arsenal
-Away team: Liverpool
+You > Show me the table
+You > Predict Arsenal vs Liverpool
+You > Title race odds
+You > How's Chelsea doing?
+You > What if Man City beats Arsenal?
 ```
 
----
+Team names are fuzzy matched — type "ars" and it resolves to "Arsenal." Typos are handled. If it needs more info, it asks.
 
-## Supported Queries
+## Why Poisson + Monte Carlo?
 
-### Standings
+**Poisson** models goal scoring as discrete, low-frequency events in a fixed window — a natural fit for football.
 
-* show me the table
-* current standings
-* league table
-* where is Arsenal
+**Monte Carlo** captures uncertainty across an entire season by simulating thousands of possible outcomes.
 
-### Match Predictions
-
-* predict arsenal vs liverpool
-* who will win man city vs chelsea
-* odds for tottenham vs newcastle
-
-### Title Race
-
-* title race
-* who will win the league
-* championship odds
-
-### Team Analysis
-
-* how's arsenal doing
-* analyze liverpool
-* info on chelsea
-
-### What-If Scenarios
-
-* what if arsenal beats liverpool
-* what happens if man city loses
-
-### Simulation
-
-* run simulation
-* simulate the season
-* run monte carlo
-
----
-
-## Why This Approach
-
-Poisson models goal scoring as discrete, low-frequency events in a fixed window. This makes it a natural fit for football.
-
-Monte Carlo simulation captures uncertainty by running thousands of possible seasons.
-
-The result is not a single prediction, but a distribution of outcomes.
-
----
+Instead of one predicted table, the model produces a distribution — a more honest view of what might happen.
 
 ## Tech Stack
 
-* Python
-* pandas
-* NumPy
-* SciPy
-* SQLite
-* Rich
-* fuzzywuzzy
-* Flask
-
----
+- **Python** — core language
+- **pandas** — data manipulation and table generation
+- **NumPy** — weighted random sampling for simulations
+- **SciPy** — Poisson PMF for match modeling
+- **SQLite** — match data, team statistics, league tables
+- **Rich** — styled terminal output, tables, progress spinners
+- **fuzzywuzzy** — fuzzy string matching for team name recognition
+- **Flask** — web dashboard
 
 ## Key Takeaways
 
-* Probability becomes intuitive when applied
-* Small changes in expected goals shift outcomes significantly
-* Reliable simulations require scale
-* Data accuracy matters when working with pandas
-* Model design involves tradeoffs, not just math
-
----
+- Probability becomes intuitive when applied to real systems
+- Small changes in expected goals significantly shift match outcomes
+- Reliable simulations require scale (10k+ runs)
+- Data manipulation accuracy matters — pandas rewards precision
+- Model design (like PPG blending) involves tradeoffs, not just math
 
 ## Future Improvements
 
-* Dynamic team strength updates
-* Goal difference as a tiebreaker
-* Data-driven home advantage
-* xG integration
-* Historical backtesting
-* Expanded CLI capabilities
----
-
-## Getting Started
-
-### Prerequisites
-
-* Python 3.10+
-* SQLite database `prem_data.db` in the project root
-
-### Installation
-
-```bash
-git clone <repo-url>
-cd PremierLeaguePredictor
-python -m venv venv
-venv\Scripts\activate        # Windows
-source venv/bin/activate     # macOS/Linux
-pip install -r data/requirements.txt
-```
-
-### Run the CLI
-
-```bash
-cd services
-python pl_predictor_cli
-```
-
+- [ ] Dynamic team strength updates mid-season
+- [ ] Goal difference as a tiebreaker in simulations
+- [ ] Data-driven home advantage per team
+- [ ] xG integration
+- [ ] Historical backtesting
+- [ ] Expanded CLI capabilities
 
 ## Acknowledgments
 
-* The Premier League
-* SciPy documentation
-* Rich library
+- The Premier League for providing endless drama to model
+- SciPy documentation for making Poisson accessible
+- Rich library for making terminal output worth looking at
