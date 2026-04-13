@@ -7,6 +7,8 @@ from scipy import stats
 from scipy.stats import poisson
 conn = sqlite3.connect("C:/Users/uzeyr/PremierLeaguePredictor/prem_data.db")
 league_table = pd.read_sql_query("SELECT * FROM league_table_2025",conn)
+if "goal_difference" not in league_table.columns:
+    league_table["goal_difference"] = league_table["goals_for"] - league_table["goals_against"]
 matches = pd.read_sql_query("SELECT * FROM match_data",conn)
 team_statistics = pd.read_sql_query("SELECT * FROM prem_teams_2025", conn)
 HOME_ADVANTAGE = 1.3
@@ -499,16 +501,16 @@ def compare_scenario(baseline_results: dict, scenario_results: dict, metric: str
 
     # get the probability dict based on the metric
     prob_key = metric_map[metric]
-    baseline_probs = baseline_results[prob_key]
-    scenario_probs = scenario_results[prob_key]
+    baseline_prob = baseline_results[prob_key]
+    scenario_prob = scenario_results[prob_key]
 
     # build dataframe for comp
     comparison = []
 
-    for team in baseline_probs.keys():
-        baseline_prob = baseline_probs[team]
-        scenario_prob = scenario_probs[team]
-        change = scenario_probs - baseline_prob
+    for team in baseline_prob.keys():
+        baseline_prob = baseline_prob[team]
+        scenario_prob = scenario_prob[team]
+        change = scenario_prob - baseline_prob
 
         comparison.append(
             {
@@ -521,12 +523,12 @@ def compare_scenario(baseline_results: dict, scenario_results: dict, metric: str
 
         )
 
-        df_result = pd.DataFrame(comparison)
-        df_result['abs_change'] = abs(df_result['change'])
-        df_result.sort_values(df_result['abs_change'], ascending= False).drop('abs_change', axis = 1)
-        df_result.reset_index(drop = True)
+    df_result = pd.DataFrame(comparison)
+    df_result['abs_change'] = df_result['change'].abs()
+    df_result.sort_values(df_result['abs_change'], ascending= False).drop('abs_change')
+    df_result.reset_index(drop = True)
 
-        return df_result
+    return df_result
 
 
 
