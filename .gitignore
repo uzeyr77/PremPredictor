@@ -212,7 +212,7 @@ __marimo__/
 
 
 # files and code needed for the flask app and not cli
-*html
+templates/*.html
 routes.py
 models.py
 services/generate_league_table.py
