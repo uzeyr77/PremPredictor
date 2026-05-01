@@ -1,5 +1,6 @@
 from services import data_handler
-from flask import Flask, render_template
+from flask import Flask, render_template, request
+from services import predictions as pred
 app = Flask(__name__, template_folder="templates")
 
 @app.route('/')
@@ -13,8 +14,11 @@ def index():
     - relegation battle
     - golden boot (maybe)
     """
-
-    return render_template('index.html')
+    league_table = pred.league_table.drop(columns= ['team_id'])
+    league_table = league_table[["team", "played", "wins", "draws", "losses", "goals_for", "goals_against", "goal_difference", "points"]]
+    columns = ["Team", "MP", "W", "D", "L", "GF", "GA", "GD", "PTS"]
+    row_data = list(league_table.values.tolist())
+    return render_template('index.html', columns = columns, row_data = row_data)
 
 @app.route("/predictions")
 def predictions():
@@ -48,6 +52,10 @@ def golden_boot():
     """
     return render_template('goldenboot.html')
 
+@app.route('/accuracy')
+def accuracy():
+
+    return render_template('accuracy.html')
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)

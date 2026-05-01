@@ -1,9 +1,38 @@
 {% extends "base.html" %}
 
 {% block title %}Home page{% endblock %}
-
-
-
 {% block content %}
-    <h1>Welcome to the Home Page</h1>
+    <h1>Dashboard</h1>
+
+<div class="league-table">
+<table class="league-table">
+           <thead>
+        <tr>
+            {% for col in columns %}
+            <th>{{ col }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in row_data %}
+        <tr>
+            {% for value in row %}
+            <td>{{ value }}</td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </tbody>
+      </table>
+    <div class="percentage_card" id="top4-card">
+
+    </div>
+
+    <div class="percentage_card" id="top2-card">
+
+
+    </div>
+
+    <div class="percentage_card" id="relegation-battle-card"> </div>
+
+    </div>
 {% endblock %}
