@@ -815,7 +815,7 @@ def build_predicted_points_table_from_snapshot(season_simulation_past_season: di
 
     for team, points_distribution in points_distribution_from_simulated_season.items():
         team_points_distribution = get_team_points_distribution_for_backtest(team, points_distribution)
-        league_points_pred_2024.loc[team, "points"] = team_points_distribution["median"]
+        league_points_pred_2024.loc[team, "points"] = int(team_points_distribution["median"])
 
         # league_points_pred.loc[team] = median_of_team_points
     return league_points_pred_2024
@@ -930,33 +930,38 @@ def backtest_model(season: str, at_gameweek: int) -> dict:
 
     '''
 
-    # load current season data
+    # load current season data from database and aggregate by matches so far and matches remaining
     df_season_data = pd.read_sql_query("SELECT * FROM match_data WHERE season=?", conn, params=("2024",))
-    # matches before game_week (including game_week)
     matches_so_far = df_season_data[df_season_data["matchweek"] <= at_gameweek]
-
-    # matches remaining
     matches_remaining = df_season_data[df_season_data["matchweek"] > at_gameweek]
 
+    # create the league table from the match data from databse (not predicting just using outcomes to show what the table looked like at matchweek x)
+    # simulate the season based on the league table at matchweek x, remaining matches, and the team stats
     snapshot_of_table = build_table_backtest(matches_so_far)
-
     season_simulation_2024 = simulate_season_from_snapshot(snapshot_of_table, matches_remaining, team_stats_2024, 10_000) # returns the dict with title, top4, and releg. probabilites
-
     league_points_predicted_2024 = build_predicted_points_table_from_snapshot(season_simulation_2024, snapshot_of_table)
 
-    mae_points = mean_absolute_error(league_points_predicted_2024["points"].values, league_table_2024_true["points"].values)
-    # print(mae_points)
-    #
+    # calculate the mae of points but first align the teams
+    # create a table with just points and team from true dataframe and make the table be the index
+    # before comparing points row by row to get the mae must align the rows
+    league_points_true_2024 = league_table_2024_true[["team", "points"]].set_index('team')
+    true, pred= league_points_true_2024.align(league_points_predicted_2024)
+    mae_points = mean_absolute_error(pred["points"], true["points"])
+
+    # calculate the += 1 values for the position of each team
     points_pred = league_points_predicted_2024["points"].values
     points_true = league_table_2024_true["points"].values
     pm1 = 0
-    for i in range(len(points_true))  :
-        if abs(int(points_pred[i]) - int(points_true[i]))  < 1:
+    for i in range(len(points_true)):
+        if abs(int(points_pred[i]) - int(points_true[i])) <=1:
             print(abs(int(points_pred[i]) - int(points_true[i])))
             pm1 += 1
 
 
-    top4_hit_count = 1 -  ((list(league_points_predicted_2024.index[:4]) != league_table_2024_true["team"].head(4).values).sum() / 4)
+    top_4_pred = list(league_points_predicted_2024.index[:4])
+    top_4_true = league_table_2024_true["team"].head(4).values
+    top4_hit_count = 1- len( set(top_4_pred) - set(top_4_true))/4
+
     winner_correct = league_points_predicted_2024.index[0] == league_table_2024_true.iat[0,0]
 
     # get the points distribution of each team
@@ -976,7 +981,9 @@ def backtest_model(season: str, at_gameweek: int) -> dict:
         "predicted_top4": list(league_points_predicted_2024.index[:4]),
         "actual_top4": list(league_table_2024_true["team"].head(4).values),
         "predicted_champion": league_points_predicted_2024.index[0],
-        "actual_champion": league_table_2024_true.iat[0,0]
+        "actual_champion": league_table_2024_true.iat[0,0],
+        "predicted_relegated": list(league_points_predicted_2024.index[-3:]),
+        "actual_relegated": list(league_table_2024_true["team"].tail(3).values)
     }
 
 
@@ -1003,9 +1010,113 @@ def build_predicted_points_table() -> DataFrame:
 
         # league_points_pred.loc[team] = median_of_team_points
     return league_points_pred
+
+
+def get_accuracy_trend(season: str, checkpoints: list[int]) -> list[dict]:
+    '''
+    Get a trend graph for the accuracy page by looping over game weeks in the list
+    and calling backtest_model() on each of the checkpoints and return the output of backtest_model
+    as a list
+    Args:
+        season: season to run backtest on
+        checkpoints: a list of ints from 0 - 38 representing the game week to run the backtest on
+
+    Returns:
+
+    '''
+
+    invalid_checkpoints = any(n < 0 for n in checkpoints)
+    if invalid_checkpoints:
+        raise ValueError(f"The game weeks: {checkpoints} are not valid")
+
+
+    payload = []
+    for game_week in checkpoints:
+        resu = backtest_model("2024", game_week)
+        payload.append(
+            resu
+        )
+
+
+    return payload
+
+
+def get_team_error_profile(season: str, at_gameweek: int) -> list[dict]:
+    '''
+    compares predicted vs actual points of each team
+    returns the per team error rows
+    e.i
+    {
+    "season": 2024,
+    "gameweek": 25,
+    "team": "Arsenal",
+    "predicted_points": 76,
+    "actual_points": 74,
+    "points_error": 2,
+    "predicted_position": 2,
+    "actual_position": 2,
+    "position_error": 0
+  },
+    Args:
+        season: season to run test on
+        at_gameweek: game week cut off
+
+    Returns: a list containing each teams error profile
+
+    '''
+    # load current season data from database and aggregate by matches so far and matches remaining
+    df_season_data = pd.read_sql_query("SELECT * FROM match_data WHERE season=?", conn, params=("2024",))
+    matches_so_far = df_season_data[df_season_data["matchweek"] <= at_gameweek]
+    matches_remaining = df_season_data[df_season_data["matchweek"] > at_gameweek]
+
+    # create the league table from the match data from databse (not predicting just using outcomes to show what the table looked like at matchweek x)
+    # simulate the season based on the league table at matchweek x, remaining matches, and the team stats
+    snapshot_of_table = build_table_backtest(matches_so_far)
+    season_simulation_2024 = simulate_season_from_snapshot(snapshot_of_table, matches_remaining, team_stats_2024,
+                                                           10_000)  # returns the dict with title, top4, and releg. probabilites
+    league_points_predicted_2024 = build_predicted_points_table_from_snapshot(season_simulation_2024, snapshot_of_table)
+    league_points_true_2024 = league_table_2024_true[["team", "points"]].set_index('team')
+
+    payload = []
+
+    if at_gameweek < 0:
+        raise ValueError(f"The game week: {at_gameweek} is not valid")
+
+    for team, row in league_points_true_2024.iterrows():
+
+        team_error_profile = {
+            "season": season,
+            "gameweek": at_gameweek,
+            "team": team,
+            "predicted_points": int(league_points_predicted_2024.loc[team,"points"]),
+            "actual_points": league_points_true_2024.loc[team, "points"],
+            "points_error": abs(int(league_points_predicted_2024.loc[team,"points"]) - int(league_points_true_2024.loc[team, "points"])),
+            "predicted_position": league_points_predicted_2024.index.get_loc(team) + 1,
+            "actual_position": league_points_true_2024.index.get_loc(team) + 1,
+            "position_error": abs(league_points_predicted_2024.index.get_loc(team) - league_points_true_2024.index.get_loc(team))
+        }
+
+        payload.append(team_error_profile)
+
+
+    return payload
+
+
+def get_data_freshness_metadata() -> dict:
+
+
+    return {
+      "season": 2024,
+      "data_as_of_date": "2025-05-25",
+      "data_as_of_gameweek": 38,
+      "played_matches": 380
+    }
+
+
+
 def main():
 
-     print(backtest_model("2024", 20))
+     print(get_team_error_profile("2024", 15))
     
 if __name__ == "__main__":
     main()

@@ -19,7 +19,7 @@ from boilerplate.services.repository import PredictionRepository
 from boilerplate.services.simulation_config import SimulationConfig, DEFAULT_SIMULATION_CONFIG
 
 
-from services.predictions import get_team_probabilities, league_table
+from services.predictions import get_team_probabilities, league_table, backtest_model, get_accuracy_trend
 from services.predictions import simulate_season
 from services.predictions import get_project_final_points
 from services import predictions as pred
@@ -291,7 +291,7 @@ class PredictionService:
         }
         raise NotImplementedError("TODO: implement scenario simulation and comparison.")
 
-    def get_accuracy_tracking(self) -> dict[str, Any]:
+    def get_accuracy_tracking(self, season: str, at_gameweek: int, checkpoints: list[int]) -> dict[str, Any]:
         """
         Build payload for /accuracy page.
 
@@ -300,5 +300,29 @@ class PredictionService:
         - Add trend metrics by gameweek
         - Add model version and data timestamp
         """
+
+        '''
+        USER SHOULD SPECIFY THE GAMEWEEKS, YEAR ETC.
+        '''
+        freshness = pred.get_data_freshness_metadata()
+        latest = backtest_model(season, at_gameweek)
+        trend = pred.get_accuracy_trend(season,checkpoints)
+        team_error_profile = pred.get_team_error_profile(season,at_gameweek)
+        now = datetime.now()
+        return {
+            "meta": {
+                "generated_at": now,
+                "season": 2024,
+                "at_gameweek": at_gameweek
+            },
+            "latest": {latest},
+            "trend": {trend},
+            "team_error_profile": {
+                team_error_profile
+            },
+            "freshness": {
+                freshness
+            }
+        }
         raise NotImplementedError("TODO: implement accuracy payload.")
 
