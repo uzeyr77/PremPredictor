@@ -1,0 +1,12 @@
+# Premier League Predictor — runtime + dev
+# pip install -r requirements.txt
+
+flask>=3.0
+pandas>=2.0
+numpy>=1.26
+scipy>=1.11
+scikit-learn>=1.3
+pytest>=8.0
+click>=8.0
+rich>=13.0
+fuzzywuzzy>=0.18

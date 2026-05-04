@@ -225,14 +225,30 @@ cd PremierLeaguePredictor
 python -m venv venv
 venv\Scripts\activate        # Windows
 source venv/bin/activate         # macOS/Linux
-pip install -r data/requirements.txt
+pip install -r requirements.txt
 ```
+
+### Run the web app
+
+From the project root (with `prem_data.db` present):
+
+```bash
+python run.py
+```
+
+Or:
+
+```bash
+set FLASK_APP=app_factory:create_app   # Windows CMD
+flask run
+```
+
+Blueprints live under [`routes/`](routes/); JSON stubs under `/api/*` can be wired to `PredictionService` in [`services/prediction_service.py`](services/prediction_service.py).
 
 ### Run the CLI
 
 ```bash
-cd services
-python pl_predictor_cli.py
+python scripts/pl_predictor_cli.py
 ```
 
 ---

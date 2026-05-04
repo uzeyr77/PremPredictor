@@ -22,4 +22,3 @@ def accuracy_api():
     Return backtest and tracking metrics.
     """
     return jsonify({"status": "stub", "message": "TODO: implement /api/accuracy."})
-

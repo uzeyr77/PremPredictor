@@ -1,4 +1,0 @@
-"""
-Contracts/models package marker.
-"""
-

@@ -1,30 +1,25 @@
 """
 Service orchestration layer for Flask routes.
 
-Analogy:
-- Repository = warehouse
-- Prediction math = factory machinery
-- Service = operations manager deciding what to run and what to return
+- Repository = data access
+- `services.predictions` = engine math
+- This module = JSON/template-facing orchestration
 """
 
 from dataclasses import dataclass
-from typing import Any, TypedDict
+from typing import Any
 from datetime import datetime
 
-from pandas.core.window.doc import template_see_also
-
-from app import predictions
-from boilerplate.models.contracts import DashboardSummary, TeamProbabilityRow
-from boilerplate.services.repository import PredictionRepository
-from boilerplate.services.simulation_config import SimulationConfig, DEFAULT_SIMULATION_CONFIG
-
+from models.contracts import DashboardSummary, TeamProbabilityRow
+from services.repository import PredictionRepository
+from services.simulation_config import SimulationConfig, DEFAULT_SIMULATION_CONFIG
+from services.validators import validate_fixture_override
 
 from services.predictions import get_team_probabilities, league_table, backtest_model, get_accuracy_trend
 from services.predictions import simulate_season
 from services.predictions import get_project_final_points
 from services import predictions as pred
 
-from validators import validate_fixture_override
 
 @dataclass
 class PredictionService:
@@ -38,18 +33,13 @@ class PredictionService:
     ) -> DashboardSummary:
         """
         Build payload for dashboard page.
-
-        TODO:
-        1) Load current table + team stats + fixtures
-        2) Compute projection + race probabilities
-        3) Return stable contract matching DashboardSummary
         """
         now = datetime.now()
         sims = simulate_season(simulations)
         projected = get_project_final_points()
 
-        title_probabilities = sims["title_probabilities"]  # dict: team -> prob
-        top_4_probs = sims["top_4_probabilities"]  # dict: team -> prob
+        title_probabilities = sims["title_probabilities"]
+        top_4_probs = sims["top_4_probabilities"]
 
         top3_teams = sorted(title_probabilities, key=title_probabilities.get, reverse=True)[:3]
         top4_teams = sorted(top_4_probs, key=top_4_probs.get, reverse=True)[:4]
@@ -72,7 +62,6 @@ class PredictionService:
             for team in top4_teams
         ]
 
-        # projected columns from your engine: team, projected_final_points, position
         projected_table = [
             {
                 "position": int(projected.iat[i, 2]),
@@ -93,7 +82,6 @@ class PredictionService:
         }
 
         return payload
-        raise NotImplementedError("TODO: implement dashboard payload assembly.")
 
     def get_detailed_predictions(
         self,
@@ -102,15 +90,10 @@ class PredictionService:
     ) -> dict[str, Any]:
         """
         Build payload for /predictions page and API.
-
-        TODO:
-        - Include full projected table
-        - Include title/top4/top2/relegation probabilities
-        - Include confidence interval blocks
         """
         team_probabilities = get_team_probabilities(10_000)
         projected = get_project_final_points()
-        sims = simulate_season(10_000)
+        all_points_distribution = simulate_season(10_000)["points_distribution"]
         projected_table = [
             {
                 "position": int(projected.iat[i, 2]),
@@ -140,7 +123,7 @@ class PredictionService:
 
         confidence_intervals = []
         for team in league_table["team"]:
-            dist = pred.get_points_distribution(team, sims)
+            dist = pred.get_team_points_distribution(all_points_distribution[team])
 
             confidence_intervals.append({
                 "team": team,
@@ -149,7 +132,7 @@ class PredictionService:
                 "p95": round(dist["p95"])
             })
 
-        payload = {
+        return {
             "meta": {
                 "simulation_count": simulations,
                 "seed": seed
@@ -159,20 +142,12 @@ class PredictionService:
             "confidence_intervals": confidence_intervals,
         }
 
-
-        return payload
-
-
-        raise NotImplementedError("TODO: implement detailed prediction payload.")
-
     def get_upcoming_fixtures(self) -> list[dict[str, Any]]:
-        """
-        Build payload for upcoming fixture page.
-        """
-        fixture_df = pred.predict_all_remaining_matches()
+        """Build payload for upcoming fixture page."""
+        fixture_df = pred.get_remaining_matches()
         payload = []
 
-        for index, match in fixture_df().iterrows():
+        for index, match in fixture_df.iterrows():
             entry = {
                 "match_date": match["date"],
                 "home_team": match["home_team"],
@@ -185,7 +160,6 @@ class PredictionService:
             payload.append(entry)
 
         return payload
-        raise NotImplementedError("TODO: implement fixture prediction payload.")
 
     def run_scenario(
         self,
@@ -193,19 +167,13 @@ class PredictionService:
         simulations: int,
         seed: int | None = None,
     ) -> dict[str, Any]:
-        """
-        Execute what-if scenario and return deltas against baseline.
-        """
-
-        # validate that the scenario given
+        """Execute what-if scenario and return deltas against baseline."""
         for scenario in overrides:
-           validate_fixture_override(scenario,league_table["teams"])
+            validate_fixture_override(scenario, set(league_table["team"]))
 
-        # get actual team probability and team probability after certain scenarios
         team_probabilities = pred.get_team_probabilities(simulations)
         scenario_probabilities = pred.simulate_scenario(overrides, simulations)
 
-        # baseline is without the scenario
         baseline = {
             "title": {
                 team: round(data["title_probability"] * 100, 1)
@@ -225,31 +193,26 @@ class PredictionService:
             }
         }
 
-        # probabilities with specific scenarios
         scenario = {
             "title": {
-                team: round(data["title_probability"] * 100, 1)
-                for team, data in scenario_probabilities.items()
+                team: round(scenario_probabilities["title_probabilities"][team] * 100, 1)
+                for team in league_table["team"]
             },
             "top2": {
-                team: round(data["top_2_probabilities"] * 100, 1)
-                for team, data in scenario_probabilities.items()
+                team: round(scenario_probabilities["top_2_probabilities"][team] * 100, 1)
+                for team in league_table["team"]
             },
             "top4": {
-                team: round(data["top_4_probability"] * 100, 1)
-                for team, data in scenario_probabilities.items()
+                team: round(scenario_probabilities["top_4_probabilities"][team] * 100, 1)
+                for team in league_table["team"]
             },
             "relegation": {
-                team: round(data["relegation_probabilities"] * 100, 1)
-                for team, data in scenario_probabilities.items()
+                team: round(scenario_probabilities["relegation_probabilities"][team] * 100, 1)
+                for team in league_table["team"]
             }
         }
 
-        # helper function metric key = "title_probs", "top4_probs"
         def compare_metric(metric_key: str) -> list[dict[str, Any]]:
-
-            # a dictionary with (team, metric_value) e.i metric_key = "title_prob"
-            # baseline_probs = { {"arsenal": 0.23, "man city": 0.77},
             baseline_probs = baseline[metric_key]
             scenario_probs = scenario[metric_key]
 
@@ -269,12 +232,12 @@ class PredictionService:
                 )
             rows.sort(key=lambda r: abs(r["change"]), reverse=True)
             return rows
-            # 4) Build comparison buckets
 
         comparison: dict[str, list[dict[str, Any]]] = {
-            "title": compare_metric("title_probabilities"),
-            "top_4": compare_metric("top_4_probabilities"),
-            "relegation": compare_metric("relegation_probabilities"),
+            "title": compare_metric("title"),
+            "top_4": compare_metric("top4"),
+            "top_2": compare_metric("top2"),
+            "relegation": compare_metric("relegation"),
         }
 
         return {
@@ -282,47 +245,27 @@ class PredictionService:
                 "simulation_count": simulations,
                 "seed": seed
             },
-
             "overrides": overrides,
             "baseline": baseline,
             "scenario": scenario,
             "comparison": comparison,
-
         }
-        raise NotImplementedError("TODO: implement scenario simulation and comparison.")
 
     def get_accuracy_tracking(self, season: str, at_gameweek: int, checkpoints: list[int]) -> dict[str, Any]:
-        """
-        Build payload for /accuracy page.
-
-        TODO:
-        - Add backtest summaries
-        - Add trend metrics by gameweek
-        - Add model version and data timestamp
-        """
-
-        '''
-        USER SHOULD SPECIFY THE GAMEWEEKS, YEAR ETC.
-        '''
+        """Build payload for /accuracy page."""
         freshness = pred.get_data_freshness_metadata()
         latest = backtest_model(season, at_gameweek)
-        trend = pred.get_accuracy_trend(season,checkpoints)
-        team_error_profile = pred.get_team_error_profile(season,at_gameweek)
+        trend = pred.get_accuracy_trend(season, checkpoints)
+        team_error_profile = pred.get_team_error_profile(season, at_gameweek)
         now = datetime.now()
         return {
             "meta": {
-                "generated_at": now,
+                "generated_at": now.isoformat(),
                 "season": 2024,
                 "at_gameweek": at_gameweek
             },
-            "latest": {latest},
-            "trend": {trend},
-            "team_error_profile": {
-                team_error_profile
-            },
-            "freshness": {
-                freshness
-            }
+            "latest": latest,
+            "trend": trend,
+            "team_error_profile": team_error_profile,
+            "freshness": freshness
         }
-        raise NotImplementedError("TODO: implement accuracy payload.")
-

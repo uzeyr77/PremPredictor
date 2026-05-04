@@ -30,4 +30,3 @@ def scenario_api():
     Apply scenario overrides and return probability deltas.
     """
     return jsonify({"status": "stub", "message": "TODO: implement /api/scenario."})
-

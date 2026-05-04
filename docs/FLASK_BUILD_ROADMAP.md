@@ -33,12 +33,12 @@ Right now, prediction logic and data access are tightly coupled. If you build UI
 This phase creates stable interfaces the UI can rely on.
 
 ### Files to create/complete
-- `boilerplate/config.py`
-- `boilerplate/services/simulation_config.py`
-- `boilerplate/services/repository.py`
-- `boilerplate/services/validators.py`
-- `boilerplate/services/prediction_service.py`
-- `boilerplate/models/contracts.py`
+- `config.py`
+- `services/simulation_config.py`
+- `services/repository.py`
+- `services/validators.py`
+- `services/prediction_service.py`
+- `models/contracts.py`
 
 ### Functions to implement
 - Repository:
@@ -76,12 +76,12 @@ Routes should be thin orchestration only. They should call service methods and r
 This keeps logic testable and reusable.
 
 ### Files to create/complete
-- `boilerplate/app_factory.py`
-- `boilerplate/routes/dashboard_routes.py`
-- `boilerplate/routes/predictions_routes.py`
-- `boilerplate/routes/fixtures_routes.py`
-- `boilerplate/routes/accuracy_routes.py`
-- `boilerplate/run.py`
+- `app_factory.py`
+- `routes/dashboard_routes.py`
+- `routes/predictions_routes.py`
+- `routes/fixtures_routes.py`
+- `routes/accuracy_routes.py`
+- `run.py`
 
 ### Routes to implement first
 - Page routes:

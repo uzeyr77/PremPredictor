@@ -1,4 +1,0 @@
-"""
-Boilerplate package marker.
-"""
-

@@ -11,10 +11,15 @@ import re
 from datetime import datetime
 import json
 
-# Import your prediction functions
+# Project root must be on sys.path so `services.predictions` resolves.
 import sys
-sys.path.insert(0, '.')
-from predictions import (
+from pathlib import Path
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
+from services.predictions import (
     simulate_season,
     predict_match,
     predict_all_remaining_matches,
@@ -24,7 +29,7 @@ from predictions import (
     get_final_table,
     get_top_4_race,
     get_title_race,
-    league_table
+    league_table,
 )
 
 console = Console()

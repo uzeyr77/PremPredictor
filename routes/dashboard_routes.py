@@ -37,4 +37,3 @@ def dashboard_api():
             "app_name": current_app.name,
         }
     )
-

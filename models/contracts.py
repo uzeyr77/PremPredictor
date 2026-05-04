@@ -36,4 +36,3 @@ class DashboardSummary(TypedDict):
 class ApiError(TypedDict):
     error: str
     detail: str
-

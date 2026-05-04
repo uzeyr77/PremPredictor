@@ -1,9 +1,5 @@
 """
 Central home for model constants and simulation defaults.
-
-Why:
-- Keeps tuning knobs in one place.
-- Prevents magic numbers spread across modules.
 """
 
 from dataclasses import dataclass
@@ -18,4 +14,3 @@ class SimulationConfig:
 
 
 DEFAULT_SIMULATION_CONFIG = SimulationConfig()
-

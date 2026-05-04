@@ -22,4 +22,3 @@ def fixtures_api():
     Return upcoming fixtures with probabilities and expected goals.
     """
     return jsonify({"status": "stub", "message": "TODO: implement /api/fixtures."})
-

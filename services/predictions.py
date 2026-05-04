@@ -2,6 +2,7 @@ import pandas as pd
 from flask import Flask, render_template
 import sqlite3
 import numpy as np
+# from pandas.conftest import ascending
 from pandas.core.interchange.dataframe_protocol import DataFrame
 from scipy import stats
 from scipy.stats import poisson
@@ -26,6 +27,12 @@ HOME_ADVANTAGE = 1.3
 LEAGUE_AVERAGE_GOALS = 1.4
 HOME_ADVANTAGE_2024 = 1.0648
 LEAGUE_AVERAGE_GOALS_2024 = 1.467
+
+def get_remaining_matches():
+    remaining_matches = matches[matches.played == 0]
+
+    return remaining_matches
+
 
 
 # main predicition algorithm
@@ -378,6 +385,7 @@ def simulate_season_scenario(fixtures, n_simulations):
     '''
     title_wins = {team: 0 for team in league_table['team']}
     top_4_finishes = {team: 0 for team in league_table['team']}
+    top_2_finishes = {team: 0 for team in league_table['team']}
     relegation_finishes = {team: 0 for team in league_table['team']}
     all_simulations = []
 
@@ -419,6 +427,8 @@ def simulate_season_scenario(fixtures, n_simulations):
         title_wins[sorted_teams.index[0]] += 1  # Winner
         for i in range(4):  # Top 4
             top_4_finishes[sorted_teams.index[i]] += 1
+        for i in range(2):
+            top_2_finishes[sorted_teams.index[i]] += 1
         for i in range(-3, 0):  # Bottom 3
             relegation_finishes[sorted_teams.index[i]] += 1
 
@@ -430,26 +440,38 @@ def simulate_season_scenario(fixtures, n_simulations):
         all_simulations.append(sim_points.copy())
         title_probs = {team: wins/n_simulations for team, wins in title_wins.items()}
         top_4_probs = {team: finishes/n_simulations for team, finishes in top_4_finishes.items()}
+        top_2_probs = {team: finishes / n_simulations for team, finishes in top_2_finishes.items()}
         relegation_probs = {team: finishes/n_simulations for team, finishes in relegation_finishes.items()}
     return {
         'title_probabilities': title_probs,
         'top_4_probabilities': top_4_probs,
+        'top_2_probabilities': top_2_probs,
         'relegation_probabilities': relegation_probs,
         'all_simulations': all_simulations,
         'points_distribution': points_distribution
     }
 
 
+def get_points_distribution(team: str, simulation_result: dict) -> dict:
+    """
+    Convenience wrapper for CLI/tools: extract one team's points sample from
+    `simulate_season` output and compute summary stats.
 
-def get_team_points_distribution(team:str, points_distribution: dict):
+    `team` is accepted for API symmetry; distribution stats depend only on the list.
+    """
+    _ = team  # reserved for logging / validation extensions
+    pts = simulation_result["points_distribution"][team]
+    return get_team_points_distribution(pts)
+
+
+def get_team_points_distribution(points_distribution: list):
 
     '''
-    Get points distribution of the final points for a specific team
+    Get points distribution of the final points for a specific team by using the list of points achieved for n simulations
 
     Args:
-        team: some team in the pr
-        points_distribution: a dict containing the team as the key and the points distribution for some n simulations
-        e.i { "arsenal": [87, 83, 83 ... n], "man city": [..]
+        points_distribution: a list containing the points distribution of a specific premier league team
+        e.i [87, 83, 83 ... n] for Arsenal
 
     Returns:   dict: {
             'min': 75,
@@ -558,15 +580,15 @@ def compare_scenario(baseline_results: dict, scenario_results: dict, metric: str
     comparison = []
 
     for team in baseline_prob.keys():
-        baseline_prob = baseline_prob[team]
-        scenario_prob = scenario_prob[team]
-        change = scenario_prob - baseline_prob
+        b = baseline_prob[team]
+        s = scenario_prob[team]
+        change = s - b
 
         comparison.append(
             {
                 'team': team,
-                'baseline_prob': baseline_prob,
-                'scenario_prob': scenario_prob,
+                'baseline_prob': b,
+                'scenario_prob': s,
                 'change': change,
                 "change_pct": change * 100
             }
@@ -575,8 +597,11 @@ def compare_scenario(baseline_results: dict, scenario_results: dict, metric: str
 
     df_result = pd.DataFrame(comparison)
     df_result['abs_change'] = df_result['change'].abs()
-    df_result.sort_values(df_result['abs_change'], ascending= False).drop('abs_change')
-    df_result.reset_index(drop = True)
+    df_result = (
+    df_result.sort_values('abs_change', ascending= False)
+    .drop(columns="abs_change")
+    .reset_index(drop=True)
+    )
 
     return df_result
 
@@ -931,14 +956,14 @@ def backtest_model(season: str, at_gameweek: int) -> dict:
     '''
 
     # load current season data from database and aggregate by matches so far and matches remaining
-    df_season_data = pd.read_sql_query("SELECT * FROM match_data WHERE season=?", conn, params=("2024",))
+    df_season_data = pd.read_sql_query("SELECT * FROM match_data WHERE season=?", conn, params=(season,))
     matches_so_far = df_season_data[df_season_data["matchweek"] <= at_gameweek]
     matches_remaining = df_season_data[df_season_data["matchweek"] > at_gameweek]
 
     # create the league table from the match data from databse (not predicting just using outcomes to show what the table looked like at matchweek x)
     # simulate the season based on the league table at matchweek x, remaining matches, and the team stats
     snapshot_of_table = build_table_backtest(matches_so_far)
-    season_simulation_2024 = simulate_season_from_snapshot(snapshot_of_table, matches_remaining, team_stats_2024, 10_000) # returns the dict with title, top4, and releg. probabilites
+    season_simulation_2024 = simulate_season_from_snapshot(snapshot_of_table, matches_remaining, team_stats_2024, 10) # returns the dict with title, top4, and releg. probabilites
     league_points_predicted_2024 = build_predicted_points_table_from_snapshot(season_simulation_2024, snapshot_of_table)
 
     # calculate the mae of points but first align the teams
@@ -949,18 +974,21 @@ def backtest_model(season: str, at_gameweek: int) -> dict:
     mae_points = mean_absolute_error(pred["points"], true["points"])
 
     # calculate the += 1 values for the position of each team
-    points_pred = league_points_predicted_2024["points"].values
-    points_true = league_table_2024_true["points"].values
-    pm1 = 0
-    for i in range(len(points_true)):
-        if abs(int(points_pred[i]) - int(points_true[i])) <=1:
-            print(abs(int(points_pred[i]) - int(points_true[i])))
-            pm1 += 1
+    pred_rank = pred["points"].rank(method="min", ascending=False)
+    true_rank = true["points"].rank(method="min", ascending=False)
+
+
+
+    plus_minus1_for_position_in_table = 0
+    for team, row in pred.iterrows():
+        if abs(int(pred_rank.loc[team]) - int(true_rank.loc[team])) <=1:
+            # print(abs(int(pred[team, "points"]) - int(true[team, "points"])))
+            plus_minus1_for_position_in_table += 1
 
 
     top_4_pred = list(league_points_predicted_2024.index[:4])
     top_4_true = league_table_2024_true["team"].head(4).values
-    top4_hit_count = 1- len( set(top_4_pred) - set(top_4_true))/4
+    top4_hit_count = len( set(top_4_pred) & set(top_4_true))/4
 
     winner_correct = league_points_predicted_2024.index[0] == league_table_2024_true.iat[0,0]
 
@@ -974,7 +1002,7 @@ def backtest_model(season: str, at_gameweek: int) -> dict:
         "at_gameweek": at_gameweek,
         "metrics": {
             "mae_points": mae_points,
-            "pm1": pm1,
+            "pm1": plus_minus1_for_position_in_table,
             "top4_hit_count": float(top4_hit_count),
             "title_winner_correct": winner_correct,
         },
@@ -1032,7 +1060,7 @@ def get_accuracy_trend(season: str, checkpoints: list[int]) -> list[dict]:
 
     payload = []
     for game_week in checkpoints:
-        resu = backtest_model("2024", game_week)
+        resu = backtest_model(season, game_week)
         payload.append(
             resu
         )
@@ -1065,7 +1093,7 @@ def get_team_error_profile(season: str, at_gameweek: int) -> list[dict]:
 
     '''
     # load current season data from database and aggregate by matches so far and matches remaining
-    df_season_data = pd.read_sql_query("SELECT * FROM match_data WHERE season=?", conn, params=("2024",))
+    df_season_data = pd.read_sql_query("SELECT * FROM match_data WHERE season=?", conn, params=(season,))
     matches_so_far = df_season_data[df_season_data["matchweek"] <= at_gameweek]
     matches_remaining = df_season_data[df_season_data["matchweek"] > at_gameweek]
 
@@ -1073,10 +1101,12 @@ def get_team_error_profile(season: str, at_gameweek: int) -> list[dict]:
     # simulate the season based on the league table at matchweek x, remaining matches, and the team stats
     snapshot_of_table = build_table_backtest(matches_so_far)
     season_simulation_2024 = simulate_season_from_snapshot(snapshot_of_table, matches_remaining, team_stats_2024,
-                                                           10_000)  # returns the dict with title, top4, and releg. probabilites
+                                                           10)  # returns the dict with title, top4, and releg. probabilites
     league_points_predicted_2024 = build_predicted_points_table_from_snapshot(season_simulation_2024, snapshot_of_table)
     league_points_true_2024 = league_table_2024_true[["team", "points"]].set_index('team')
 
+    pred_rank = league_points_predicted_2024["points"].rank(method="min", ascending=False)
+    true_rank = league_points_true_2024["points"].rank(method="min", ascending=False)
     payload = []
 
     if at_gameweek < 0:
@@ -1091,9 +1121,9 @@ def get_team_error_profile(season: str, at_gameweek: int) -> list[dict]:
             "predicted_points": int(league_points_predicted_2024.loc[team,"points"]),
             "actual_points": league_points_true_2024.loc[team, "points"],
             "points_error": abs(int(league_points_predicted_2024.loc[team,"points"]) - int(league_points_true_2024.loc[team, "points"])),
-            "predicted_position": league_points_predicted_2024.index.get_loc(team) + 1,
-            "actual_position": league_points_true_2024.index.get_loc(team) + 1,
-            "position_error": abs(league_points_predicted_2024.index.get_loc(team) - league_points_true_2024.index.get_loc(team))
+            "predicted_position": int(pred_rank[team]),
+            "actual_position": int(true_rank[team]),
+            "position_error": int(abs(pred_rank[team] - true_rank[team]))
         }
 
         payload.append(team_error_profile)
@@ -1115,8 +1145,12 @@ def get_data_freshness_metadata() -> dict:
 
 
 def main():
+    sims = simulate_season(10)["all_simulations"]
+    print(f"regular sim: {sims}")
+    scen = [{"home": "West Ham", "away": "Leeds", "result": 'home_win'}]
+    scen_sim = simulate_scenario(scen, 10)["all_simulations"]
 
-     print(get_team_error_profile("2024", 15))
+    # print(f"scenario sim {scen_sim}")
     
 if __name__ == "__main__":
     main()
