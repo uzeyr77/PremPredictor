@@ -210,7 +210,7 @@ __marimo__/
 # database
 .db
 
-
+.md
 # files and code needed for the flask app and not cli
 #templates/*.html
 #routes.py
