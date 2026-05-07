@@ -35,7 +35,7 @@ class PredictionService:
         Build payload for dashboard page.
         """
         now = datetime.now()
-        sims = simulate_season(simulations)
+        sims = simulate_season(simulations, seed)
         projected = get_project_final_points()
 
         title_probabilities = sims["title_probabilities"]
@@ -93,7 +93,7 @@ class PredictionService:
         """
         team_probabilities = get_team_probabilities(10_000)
         projected = get_project_final_points()
-        all_points_distribution = simulate_season(10_000)["points_distribution"]
+        all_points_distribution = simulate_season(10_000, seed)["points_distribution"]
         projected_table = [
             {
                 "position": int(projected.iat[i, 2]),
@@ -172,7 +172,7 @@ class PredictionService:
             validate_fixture_override(scenario, set(league_table["team"]))
 
         team_probabilities = pred.get_team_probabilities(simulations)
-        scenario_probabilities = pred.simulate_scenario(overrides, simulations)
+        scenario_probabilities = pred.simulate_scenario(overrides, simulations, seed)
 
         baseline = {
             "title": {

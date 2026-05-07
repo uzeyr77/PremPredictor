@@ -1,38 +1,66 @@
 {% extends "base.html" %}
 
-{% block title %}Home page{% endblock %}
+{# Page title shown in the browser tab #}
+{% block title %}Dashboard{% endblock %}
+
 {% block content %}
     <h1>Dashboard</h1>
 
-<div class="league-table">
-<table class="league-table">
-           <thead>
-        <tr>
-            {% for col in columns %}
-            <th>{{ col }}</th>
-            {% endfor %}
-        </tr>
-    </thead>
-    <tbody>
-        {% for row in row_data %}
-        <tr>
-            {% for value in row %}
-            <td>{{ value }}</td>
-            {% endfor %}
-        </tr>
-        {% endfor %}
-    </tbody>
-      </table>
-    <div class="percentage_card" id="top4-card">
+    {# These variables come from render_template(..., **payload) in dashboard_page #}
+    <p class="text-muted">
+        Simulation count: {{ simulation_count }} —
+        Last updated: {{ last_updated }}
+    </p>
 
+    <h2 class="h5 mt-4">Projected table</h2>
+    <div class="table-responsive">
+        <table class="table table-striped table-sm league-table">
+            <thead>
+                <tr>
+                    <th>Position</th>
+                    <th>Team</th>
+                    <th>Points</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in projected_table %}
+                <tr>
+                    <td>{{ row.position }}</td>
+                    <td>{{ row.team }}</td>
+                    <td>{{ row.points }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 
-    <div class="percentage_card" id="top2-card">
-
-
-    </div>
-
-    <div class="percentage_card" id="relegation-battle-card"> </div>
-
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <h2 class="h5">Title favorites (top 3)</h2>
+            <ul class="list-group">
+                {% for row in title_favorites %}
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>{{ row.team }}</span>
+                    <span class="text-muted">
+                        title {{ "%.1f"|format(row.title_probability * 100) }}%
+                        · top4 {{ "%.1f"|format(row.top_4_probability * 100) }}%
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="col-md-6">
+            <h2 class="h5">Top 4 race (top 4)</h2>
+            <ul class="list-group">
+                {% for row in top_4_race %}
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>{{ row.team }}</span>
+                    <span class="text-muted">
+                        top4 {{ "%.1f"|format(row.top_4_probability * 100) }}%
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
     </div>
 {% endblock %}

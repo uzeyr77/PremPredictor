@@ -266,7 +266,7 @@ def predict_all_remaining_matches():
     return predicted_results
         
 
-def simulate_season(n_simulations):
+def simulate_season(n_simulations, seed=None):
     '''
    simulates the season for n iterations (monte carlo sim) 
    process: call predict_mall_remaining the remaining fixtures (games in the matches db with played == 0), which returns a dataframe containing all the matches and the probability of a win, loss, or draw
@@ -281,6 +281,7 @@ def simulate_season(n_simulations):
    - and every single point recorded for every season so if arsenal got 87, then 85, 84, 82 ... n that gets stored in a dictionary with (team, list(all_points)]
     Args:
         n_simulations: an integer for number of simulations to run
+        seed: starter number so any prediction outcome can be mimicked
 
     Returns: {
          'title_probabilities': title_probs,
@@ -291,6 +292,7 @@ def simulate_season(n_simulations):
         }
 
     '''
+    rng = np.random.default_rng(seed)
     title_wins = {team: 0 for team in league_table['team']}
     top_4_finishes = {team: 0 for team in league_table['team']}
     top_2_finishes = {team: 0 for team in league_table['team']}
@@ -314,7 +316,7 @@ def simulate_season(n_simulations):
             probs = [match['home_win_prob'], match['draw_prob'], match['away_win_prob']]
             # print(f"{home} vs {away}: prob: {probs}\n")
             # Randomly sample outcome based on probabilities
-            outcome = np.random.choice(['home_win', 'draw', 'away_win'], p=probs)
+            outcome = rng.choice(['home_win', 'draw', 'away_win'], p=probs)
             # print(f"{outcome}\n")
             # Award points
 
@@ -360,10 +362,11 @@ def simulate_season(n_simulations):
         'points_distribution': points_distribution
     }
 # monte carlo simulation for the scenario based simulation, helper function, will not be called directly
-def simulate_season_scenario(fixtures, n_simulations):
+def simulate_season_scenario(fixtures, n_simulations, seed=None):
     '''
       simulates the season for n iterations (monte carlo sim) but based on specific scenario(s)
     Args:
+        seed: starter number so any prediction outcome can be mimicked
         n_simulations: an integer for number of simulations to run
         fixtures: an array containing scenarios for matches that have yet to occur
         of the form:
@@ -383,6 +386,7 @@ def simulate_season_scenario(fixtures, n_simulations):
         }
 
     '''
+    rng = np.random.default_rng(seed)
     title_wins = {team: 0 for team in league_table['team']}
     top_4_finishes = {team: 0 for team in league_table['team']}
     top_2_finishes = {team: 0 for team in league_table['team']}
@@ -405,7 +409,7 @@ def simulate_season_scenario(fixtures, n_simulations):
             probs = [match['home_win_prob'], match['draw_prob'], match['away_win_prob']]
             # print(f"{home} vs {away}: prob: {probs}\n")
             # Randomly sample outcome based on probabilities
-            outcome = np.random.choice(['home_win', 'draw', 'away_win'], p=probs)
+            outcome = rng.choice(['home_win', 'draw', 'away_win'], p=probs)
             # print(f"{outcome}\n")
             # Award points
 
@@ -493,7 +497,7 @@ def get_team_points_distribution(points_distribution: list):
     }
 
 
-def simulate_scenario(fixture_overrides: list[dict], n_simulations=5000):
+def simulate_scenario(fixture_overrides: list[dict], n_simulations=5000, seed=None):
     """
     Simulate season with user-specified results
 
@@ -503,6 +507,7 @@ def simulate_scenario(fixture_overrides: list[dict], n_simulations=5000):
             {'home': 'Man City', 'away': 'Chelsea', 'result': 'draw'}
         ]
         n_simulations (int): Number of simulations (fewer for speed)
+        Seed: starter number so any prediction outcome can be mimicked
 
     Returns:
         dict: Same format as simulate_season()
@@ -555,7 +560,7 @@ def simulate_scenario(fixture_overrides: list[dict], n_simulations=5000):
 
 
     # simualte season with the remaining fixtures (not including the first outcomes) default is 10_000 runs
-    return simulate_season_scenario(remaining_fixtures, n_simulations)
+    return simulate_season_scenario(remaining_fixtures, n_simulations, seed)
 
 def compare_scenario(baseline_results: dict, scenario_results: dict, metric: str) -> DataFrame:
     # compare baseline Vs scenario prediction results
@@ -725,7 +730,7 @@ def predict_all_remaining_matches_backtest(remaining_matches: DataFrame) -> Data
     predicted_results = pd.DataFrame(predicted_rows)
 
     return predicted_results
-def simulate_season_from_snapshot(snapshot_table: DataFrame, remaining_matches: DataFrame, team_stats: DataFrame, n_simulations: int) -> dict:
+def simulate_season_from_snapshot(snapshot_table: DataFrame, remaining_matches: DataFrame, team_stats: DataFrame, n_simulations: int, seed = None) -> dict:
     '''
     With the data from a specific season, build on the current table (table_snapshot) by predicting what will happen for
     the remaining matches using the team_stats which has data like attack_strength defense_strength etc
@@ -740,8 +745,7 @@ def simulate_season_from_snapshot(snapshot_table: DataFrame, remaining_matches: 
     e.i title_probs is a dict with each team and their probabilities of winning the title
     '''
 
-
-
+    rng = np.random.default_rng(seed)
     title_wins = {team: 0 for team in snapshot_table['team']}
     top_4_finishes = {team: 0 for team in snapshot_table['team']}
     top_2_finishes = {team: 0 for team in snapshot_table['team']}
@@ -767,7 +771,7 @@ def simulate_season_from_snapshot(snapshot_table: DataFrame, remaining_matches: 
             probs = [match['home_win_prob'], match['draw_prob'], match['away_win_prob']]
             # print(f"{home} vs {away}: prob: {probs}\n")
             # Randomly sample outcome based on probabilities
-            outcome = np.random.choice(['home_win', 'draw', 'away_win'], p=probs)
+            outcome = rng.choice(['home_win', 'draw', 'away_win'], p=probs)
             # print(f"{outcome}\n")
             # Award points
 
