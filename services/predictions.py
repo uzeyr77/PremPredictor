@@ -1,26 +1,10 @@
 import pandas as pd
-from flask import Flask, render_template
-import sqlite3
 import numpy as np
-# from pandas.conftest import ascending
 from pandas.core.interchange.dataframe_protocol import DataFrame
-from scipy import stats
 from scipy.stats import poisson
 from sklearn.metrics import mean_absolute_error
 
-# set up connection and query database
-conn = sqlite3.connect("C:/Users/uzeyr/PremierLeaguePredictor/prem_data.db")
-league_table = pd.read_sql_query("SELECT * FROM league_table_2025",conn)
-league_table_2024_true = pd.read_sql_query("SELECT * FROM league_table_2024_final",conn)
-
-matches = pd.read_sql_query("SELECT * FROM match_data",conn)
-team_stats_2024 = pd.read_sql_query("SELECT * FROM prem_teams_2024", conn)
-team_statistics = pd.read_sql_query("SELECT * FROM prem_teams_2025", conn)
-
-
-# add column for league table for goal difference
-if "goal_difference" not in league_table.columns:
-    league_table["goal_difference"] = league_table["goals_for"] - league_table["goals_against"]
+from services.repository import PredictionRepository  # for annotations
 
 # constants for predictions
 HOME_ADVANTAGE = 1.3
@@ -28,46 +12,48 @@ LEAGUE_AVERAGE_GOALS = 1.4
 HOME_ADVANTAGE_2024 = 1.0648
 LEAGUE_AVERAGE_GOALS_2024 = 1.467
 
-def get_remaining_matches():
-    remaining_matches = matches[matches.played == 0]
-
-    return remaining_matches
-
+def get_remaining_matches(repo: PredictionRepository) -> pd.DataFrame:
+   match_data = repo.get_match_data()
+   remaining_matches = match_data[match_data.played == 0]
+   return remaining_matches
 
 
 # main predicition algorithm
 
-def get_current_table() -> DataFrame:
-    return league_table
+def get_current_table(repo: PredictionRepository) -> DataFrame:
+    league_table1 = repo.get_current_table()
+    league_table1['goal_difference'] = league_table1['goals_for'] - league_table1['goals_against']
+    return league_table1
 
-def get_final_table() -> DataFrame:
+def get_final_table(repo: PredictionRepository) -> DataFrame:
     '''Returns the final table after the end of the season based on projected final points'''
-    df_projected_points = get_project_final_points()
-    curr_points = pd.DataFrame({'team': league_table['team'], 'points': league_table['points']})
+    df_projected_points = get_project_final_points(repo)
+    current_table = repo.get_current_table()
+    curr_points = pd.DataFrame({'team': current_table['team'], 'points': current_table['points']})
     df_projected_table = curr_points.merge(df_projected_points)
-    return df_projected_table
-    
-   
+    return df_projected_table.sort_values(by='projected_final_points', ascending=False)
+
+
 # wrapper to return the top 4 from predicitions
-def get_top_4_race() -> DataFrame:
+def get_top_4_race(repo: PredictionRepository) -> DataFrame:
     '''
     function to get the top 4 teams in the league from predictions
     Returns: dataframe of the final table with only top 4 teams
 
     '''
-    final_table = get_final_table()
-    
+    final_table = get_final_table(repo)
+
     return final_table.head(4)
 
 # wrapper to return the top 2 favourities from predicitions
-def get_title_race() -> DataFrame:
+def get_title_race(repo: PredictionRepository) -> DataFrame:
     '''returns the top 2 teams of the table'''
-    final_table = get_final_table()
-    
+    final_table = get_final_table(repo)
+
     return final_table.head(2)
     
 # helper functions
-def get_actual_ppg() -> DataFrame:
+def get_actual_ppg(repo: PredictionRepository) -> DataFrame:
 
     '''
     Function to get the true points per game of each team and returns a dataframe
@@ -75,23 +61,25 @@ def get_actual_ppg() -> DataFrame:
     Returns: a dataframe with the columns team and actual_ppg
 
     '''
-    ppg = pd.DataFrame({'team': league_table["team"], 'actual_ppg': league_table["points"] / league_table["played"]})
+    current_table = repo.get_current_table()
+    ppg = pd.DataFrame({'team': current_table["team"], 'actual_ppg': current_table["points"] / current_table["played"]})
     return ppg
 
-def get_expected_ppg():
+def get_expected_ppg(repo: PredictionRepository):
     '''returns a dataframe for the expected points per game based on attack/defense strength'''
-    df_goal_difference = get_goal_difference()
+    df_goal_difference = get_goal_difference(repo)
     df_expected_ppg = goal_difference_to_expected_ppg(df_goal_difference)
     
     return df_expected_ppg
 
-def get_goal_difference():
+def get_goal_difference(repo: PredictionRepository):
     '''Leage average for goals scored and conceded is also 1.4, returns a dataframe for the goal differene of each team
     goal difference for any team is calculated by attack_strength * league_avg - defense_strength * league_avg'''
      # league average for goals scored and conceded is 1.4
     # goal difference is attack strng * leage avg - defense strng * league avg
-    df_goal_difference = pd.DataFrame({'team': team_statistics["team"], 'goal_difference': team_statistics['attack_strength'] * 1.4 - team_statistics['defense_strength'] * 1.4})
-    return df_goal_difference 
+    stats = repo.get_team_statistics()
+    df_goal_difference = pd.DataFrame({'team': stats["team"], 'goal_difference': stats['attack_strength'] * 1.4 - stats['defense_strength'] * 1.4})
+    return df_goal_difference.sort_values(by='goal_difference', ascending=False)
 
 def goal_difference_to_expected_ppg(df_goal_difference):
     '''args: dataframe representing the goal difference of each team
@@ -121,29 +109,29 @@ def goal_difference_to_expected_ppg(df_goal_difference):
 
 
 
-def get_combined_ppg():
-    blended_ppg = get_blended_ppg()
-    actual_ppg = get_actual_ppg()
-    expected_ppg = get_expected_ppg()
+def get_combined_ppg(repo: PredictionRepository):
+    blended_ppg = get_blended_ppg(repo)
+    actual_ppg = get_actual_ppg(repo)
+    expected_ppg = get_expected_ppg(repo)
     combined_ppg = actual_ppg.merge(expected_ppg).merge(blended_ppg)
     return combined_ppg
     
     
-def get_blended_ppg():
+def get_blended_ppg(repo: PredictionRepository):
     # blended ppg formula: actual_ppg * .70 + expected_ppg * .30
     '''
     Blended_ppg = ppg_true * .30 + ppg_expected * .70
     Returns: a dataframe that contains every team and their blended ppg
 
     '''
-    actual_ppg = get_actual_ppg()
-    expected_ppg = get_expected_ppg()
+    actual_ppg = get_actual_ppg(repo)
+    expected_ppg = get_expected_ppg(repo)
     blended_ppg = actual_ppg['actual_ppg'].values* .70 + expected_ppg['expected_ppg'].values * .30
     df_blended_ppg = pd.DataFrame({'team': expected_ppg['team'].values, 'blended_ppg': blended_ppg})
     
     return df_blended_ppg
 
-def get_project_final_points() -> DataFrame:
+def get_project_final_points(repo: PredictionRepository) -> DataFrame:
     # projected final points = current_points + (blended_ppg * games remaining)
 
     '''
@@ -154,17 +142,21 @@ def get_project_final_points() -> DataFrame:
     Dataframe with columns [team, projected_final_points, position]
     return:     Dataframe with columns [team, projected_final_points, position]
     '''
-    current_points = pd.Series(league_table['points'])
-    blended_ppg = get_blended_ppg()['blended_ppg']
-    games_left = pd.Series(38 - league_table['played'])
-    resu = pd.DataFrame({'team': league_table['team'],'projected_final_points':round(current_points + (blended_ppg * games_left))})
+    current_table = repo.get_current_table()
+    current_points = pd.Series(current_table['points'])
+    blended_ppg = get_blended_ppg(repo)['blended_ppg']
+    games_left = pd.Series(38 - current_table['played'])
+    resu = pd.DataFrame({
+        'team': current_table['team'],
+        'projected_final_points': round(current_points + (blended_ppg * games_left)),
+    })
     resu = resu.sort_values(by='projected_final_points', ascending=False)
     resu = resu.reset_index(drop=True) # makes sure that position matches up with the projected_final_points
     resu['position'] = resu.index + 1
     return resu
 
 
-def predict_match(home_team:str,away_team:str):
+def predict_match(repo: PredictionRepository, home_team: str, away_team: str):
     #  expected goals are the lambda values for each team
     #  poisson.pmf(k, Lambda) k represents the number of events (goals) and lambda is expected
     #  poisson.pmf(2, 1.6) is the probability of scoring EXACTLY 2 goals when the expected is 1.6
@@ -173,6 +165,7 @@ def predict_match(home_team:str,away_team:str):
     poisson.pmf(k, lambda): k represents the number of occurrences for some event, and lambda is expected(mean) number of occurrences
     so it returns the probability of that event happening k times
     Args:
+        repo: PredictionRepository used to fetch team statistics
         home_team: the home team of a match
         away_team: the away team of a match
 
@@ -186,6 +179,7 @@ def predict_match(home_team:str,away_team:str):
     for each match
 
     '''
+    team_statistics = repo.get_team_statistics()
     home_attack =  team_statistics.loc[team_statistics['team'] == home_team, 'attack_strength'].values[0]
     home_defense = team_statistics.loc[team_statistics['team'] == home_team, 'defense_strength'].values[0]
     away_attack =  team_statistics.loc[team_statistics['team'] == away_team, 'attack_strength'].values[0]
@@ -220,9 +214,9 @@ def predict_match(home_team:str,away_team:str):
     # print("draw prob:", draw_prob)       
     return resu
 
-def predict_all_remaining_matches():
+def predict_all_remaining_matches(repo: PredictionRepository):
     """
-    Predict all unplayed fixtures for current season. Calls predict_match(home_team, away_team) which returns a percentage representing the probability of a draw, win, or a loss
+    Predict all unplayed fixtures for current season. Calls predict_match(repo, home_team, away_team) which returns a percentage representing the probability of a draw, win, or a loss
     as well as expected goals from each
     Returns:
         DataFrame with columns:
@@ -235,13 +229,14 @@ def predict_all_remaining_matches():
         - expected_home_goals
         - expected_away_goals
     """
-    remaining_matches = matches[matches['played'] == 0]
+    match_data = repo.get_match_data()
+    remaining_matches = match_data[match_data['played'] == 0]
     predicted_rows = []
     for index in remaining_matches.index: # loop through indices
         match = remaining_matches.loc[index] # match is the ith row in the column
         home_t = match['home_team']
         away_t = match['away_team']
-        match_prediction = predict_match(home_t, away_t)
+        match_prediction = predict_match(repo, home_t, away_t)
         home_win_prob = match_prediction['home_win_prob']
         draw_prob = match_prediction['draw_prob']
         away_win_prob = match_prediction['away_win_prob']
@@ -266,7 +261,7 @@ def predict_all_remaining_matches():
     return predicted_results
         
 
-def simulate_season(n_simulations, seed=None):
+def simulate_season(repo: PredictionRepository, n_simulations, seed=None):
     '''
    simulates the season for n iterations (monte carlo sim) 
    process: call predict_mall_remaining the remaining fixtures (games in the matches db with played == 0), which returns a dataframe containing all the matches and the probability of a win, loss, or draw
@@ -280,6 +275,7 @@ def simulate_season(n_simulations, seed=None):
    - relegated count
    - and every single point recorded for every season so if arsenal got 87, then 85, 84, 82 ... n that gets stored in a dictionary with (team, list(all_points)]
     Args:
+        repo: PredictionRepository used to fetch current table and remaining fixtures
         n_simulations: an integer for number of simulations to run
         seed: starter number so any prediction outcome can be mimicked
 
@@ -293,16 +289,17 @@ def simulate_season(n_simulations, seed=None):
 
     '''
     rng = np.random.default_rng(seed)
-    title_wins = {team: 0 for team in league_table['team']}
-    top_4_finishes = {team: 0 for team in league_table['team']}
-    top_2_finishes = {team: 0 for team in league_table['team']}
-    relegation_finishes = {team: 0 for team in league_table['team']}
+    current_table = repo.get_current_table()
+    title_wins = {team: 0 for team in current_table['team']}
+    top_4_finishes = {team: 0 for team in current_table['team']}
+    top_2_finishes = {team: 0 for team in current_table['team']}
+    relegation_finishes = {team: 0 for team in current_table['team']}
     all_simulations = []
 
-    current_points = league_table[['team', 'points']].set_index('team')
-    
-    remaining_fixtures = predict_all_remaining_matches()
-    teams = league_table['team'].tolist()
+    current_points = current_table[['team', 'points']].set_index('team')
+
+    remaining_fixtures = predict_all_remaining_matches(repo)
+    teams = current_table['team'].tolist()
     points_distribution = {team: [] for team in teams}
     # print(current_points)
     for sim in range(n_simulations):
@@ -362,10 +359,11 @@ def simulate_season(n_simulations, seed=None):
         'points_distribution': points_distribution
     }
 # monte carlo simulation for the scenario based simulation, helper function, will not be called directly
-def simulate_season_scenario(fixtures, n_simulations, seed=None):
+def simulate_season_scenario(repo: PredictionRepository, fixtures, n_simulations, seed=None):
     '''
       simulates the season for n iterations (monte carlo sim) but based on specific scenario(s)
     Args:
+        repo: PredictionRepository used to fetch current table
         seed: starter number so any prediction outcome can be mimicked
         n_simulations: an integer for number of simulations to run
         fixtures: an array containing scenarios for matches that have yet to occur
@@ -387,15 +385,16 @@ def simulate_season_scenario(fixtures, n_simulations, seed=None):
 
     '''
     rng = np.random.default_rng(seed)
-    title_wins = {team: 0 for team in league_table['team']}
-    top_4_finishes = {team: 0 for team in league_table['team']}
-    top_2_finishes = {team: 0 for team in league_table['team']}
-    relegation_finishes = {team: 0 for team in league_table['team']}
+    current_table = repo.get_current_table()
+    title_wins = {team: 0 for team in current_table['team']}
+    top_4_finishes = {team: 0 for team in current_table['team']}
+    top_2_finishes = {team: 0 for team in current_table['team']}
+    relegation_finishes = {team: 0 for team in current_table['team']}
     all_simulations = []
 
-    current_points = league_table[['team', 'points']].set_index('team')
+    current_points = current_table[['team', 'points']].set_index('team')
     remaining_fixtures = fixtures
-    teams = league_table['team'].tolist()
+    teams = current_table['team'].tolist()
     points_distribution = {team: [] for team in teams}
 
     for sim in range(n_simulations):
@@ -497,11 +496,12 @@ def get_team_points_distribution(points_distribution: list):
     }
 
 
-def simulate_scenario(fixture_overrides: list[dict], n_simulations=5000, seed=None):
+def simulate_scenario(repo: PredictionRepository, fixture_overrides: list[dict], n_simulations=5000, seed=None):
     """
     Simulate season with user-specified results
 
     Args:
+        repo: PredictionRepository used to fetch current table and match data
         fixture_overrides (list): [
             {'home': 'Arsenal', 'away': 'Liverpool', 'result': 'home_win'},
             {'home': 'Man City', 'away': 'Chelsea', 'result': 'draw'}
@@ -518,11 +518,13 @@ def simulate_scenario(fixture_overrides: list[dict], n_simulations=5000, seed=No
     '''
 
     # check if the fixtures given have already happened by looking through the matches dataframe
-    all_remaining_matches = matches[matches['played'] == 0]
+    match_data = repo.get_match_data()
+    all_remaining_matches = match_data[match_data['played'] == 0]
     all_remaining_matches = all_remaining_matches[["home_team", "away_team"]]
 
     # makes it so current points is a df that has 2 columns only, namly team name and points and the index is team
-    current_points = league_table[['team', 'points']].set_index('team')
+    current_table = repo.get_current_table()
+    current_points = current_table[['team', 'points']].set_index('team')
 
     for override in fixture_overrides:
         home_team = override['home']
@@ -538,7 +540,7 @@ def simulate_scenario(fixture_overrides: list[dict], n_simulations=5000, seed=No
             current_points.at[away_team, 'points'] += 1
 
     # predict the rest of the fixtures not including the ones overridden
-    all_fixtures = predict_all_remaining_matches()
+    all_fixtures = predict_all_remaining_matches(repo)
 
     # create a set of the fixtures to override from the fixture_overrides passed
     # e.i before: [ {'home': man city, 'away': arsenal}, {...}, and so on change to --> set {(arsenal, man city), (..,..), ..}
@@ -560,7 +562,7 @@ def simulate_scenario(fixture_overrides: list[dict], n_simulations=5000, seed=No
 
 
     # simualte season with the remaining fixtures (not including the first outcomes) default is 10_000 runs
-    return simulate_season_scenario(remaining_fixtures, n_simulations, seed)
+    return simulate_season_scenario(repo, remaining_fixtures, n_simulations, seed)
 
 def compare_scenario(baseline_results: dict, scenario_results: dict, metric: str) -> DataFrame:
     # compare baseline Vs scenario prediction results
@@ -611,11 +613,12 @@ def compare_scenario(baseline_results: dict, scenario_results: dict, metric: str
     return df_result
 
 
-def get_team_probabilities(n_simulations):
+def get_team_probabilities(repo: PredictionRepository, n_simulations):
 
-    resu = simulate_season(n_simulations)
+    resu = simulate_season(repo, n_simulations)
     all_team_summary = {}
-    for team in league_table["team"]:
+    current_table = repo.get_current_table()
+    for team in current_table["team"]:
         team_summary = {
             "team": team,
             "title_probability": resu["title_probabilities"][team],
@@ -686,9 +689,10 @@ def predict_match_backtest(home_team: str, away_team: str, team_data: DataFrame)
     # print("home win:", away_win_prob)
     # print("draw prob:", draw_prob)
     return resu
-def predict_all_remaining_matches_backtest(remaining_matches: DataFrame) -> DataFrame:
+def predict_all_remaining_matches_backtest(repo: PredictionRepository, remaining_matches: DataFrame) -> DataFrame:
     """
     Predict all unplayed fixtures for current season
+    repo: PredictionRepository used to fetch 2024 team statistics
     remaining_matches: a dataframe containing the matches to predict the outcome of
     Returns:
         DataFrame with columns:
@@ -702,6 +706,7 @@ def predict_all_remaining_matches_backtest(remaining_matches: DataFrame) -> Data
         - expected_away_goals
     """
     remaining_matches = remaining_matches
+    team_stats_2024 = repo.get_team_stats_2024()
     predicted_rows = []
     for index in remaining_matches.index:  # loop through indices
         match = remaining_matches.loc[index]  # match is the ith row in the column
@@ -730,12 +735,13 @@ def predict_all_remaining_matches_backtest(remaining_matches: DataFrame) -> Data
     predicted_results = pd.DataFrame(predicted_rows)
 
     return predicted_results
-def simulate_season_from_snapshot(snapshot_table: DataFrame, remaining_matches: DataFrame, team_stats: DataFrame, n_simulations: int, seed = None) -> dict:
+def simulate_season_from_snapshot(repo: PredictionRepository, snapshot_table: DataFrame, remaining_matches: DataFrame, team_stats: DataFrame, n_simulations: int, seed = None) -> dict:
     '''
     With the data from a specific season, build on the current table (table_snapshot) by predicting what will happen for
     the remaining matches using the team_stats which has data like attack_strength defense_strength etc
 
     Args:
+        repo: PredictionRepository, threaded through to predict_all_remaining_matches_backtest
         snapshot_table: snapshot of how the table looks at some matchweek in a past season (e.i matchweek 14 of 2023-2024 season)
         remaining_matches: a table containing the remaining matches of some matchweek
         team_stats: the datapoints for each team, like attack strength, defense strength
@@ -755,7 +761,7 @@ def simulate_season_from_snapshot(snapshot_table: DataFrame, remaining_matches: 
 
     current_points = snapshot_table[['team', 'points']].set_index('team')
     teams = snapshot_table['team'].tolist()
-    remaining_fixtures = predict_all_remaining_matches_backtest(remaining_matches)
+    remaining_fixtures = predict_all_remaining_matches_backtest(repo, remaining_matches)
     points_distribution = {team: [] for team in teams}
 
     # print(current_points)
@@ -850,16 +856,18 @@ def build_predicted_points_table_from_snapshot(season_simulation_past_season: di
     return league_points_pred_2024
 
 
-def build_table_backtest(match_data: DataFrame):
+def build_table_backtest(repo: PredictionRepository, match_data: DataFrame):
         '''
 
         Args:
+            repo: PredictionRepository used to fetch 2024 team statistics
             match_data: match_data from previous season up to some matchweek n containing date, hom team, away team, result etc.
             so basically the data of games so far
 
         Returns: snapshot of the league table based on those results from matchweek 0 to n
         '''
         # win, loss, or draw and points, goals Scored, goals Conceded
+        team_stats_2024 = repo.get_team_stats_2024()
         teams = team_stats_2024["team"]
         # drop the first row "teams"
         teams = teams[teams != 'team']
@@ -947,11 +955,12 @@ def get_team_points_distribution_for_backtest(team:str, points_distribution: dic
 
 
 
-def backtest_model(season: str, at_gameweek: int) -> dict:
+def backtest_model(repo: PredictionRepository, season: str, at_gameweek: int) -> dict:
 
     '''
 
     Args:
+        repo: PredictionRepository used to fetch match data, 2024 team stats, and final 2024 table
         season: a year in the form of a string e.i 2024, 2025
         at_gameweek: some game week 0 <= at_gameweek <= 38
 
@@ -960,14 +969,16 @@ def backtest_model(season: str, at_gameweek: int) -> dict:
     '''
 
     # load current season data from database and aggregate by matches so far and matches remaining
-    df_season_data = pd.read_sql_query("SELECT * FROM match_data WHERE season=?", conn, params=(season,))
+    all_match_data = repo.get_match_data()
+    df_season_data = all_match_data[all_match_data['season'] == int(season)]
     matches_so_far = df_season_data[df_season_data["matchweek"] <= at_gameweek]
     matches_remaining = df_season_data[df_season_data["matchweek"] > at_gameweek]
-
     # create the league table from the match data from databse (not predicting just using outcomes to show what the table looked like at matchweek x)
     # simulate the season based on the league table at matchweek x, remaining matches, and the team stats
-    snapshot_of_table = build_table_backtest(matches_so_far)
-    season_simulation_2024 = simulate_season_from_snapshot(snapshot_of_table, matches_remaining, team_stats_2024, 10) # returns the dict with title, top4, and releg. probabilites
+    team_stats_2024 = repo.get_team_stats_2024()
+    league_table_2024_true = repo.get_league_table_2024()
+    snapshot_of_table = build_table_backtest(repo, matches_so_far)
+    season_simulation_2024 = simulate_season_from_snapshot(repo, snapshot_of_table, matches_remaining, team_stats_2024, 1) # returns the dict with title, top4, and releg. probabilites
     league_points_predicted_2024 = build_predicted_points_table_from_snapshot(season_simulation_2024, snapshot_of_table)
 
     # calculate the mae of points but first align the teams
@@ -980,7 +991,6 @@ def backtest_model(season: str, at_gameweek: int) -> dict:
     # calculate the += 1 values for the position of each team
     pred_rank = pred["points"].rank(method="min", ascending=False)
     true_rank = true["points"].rank(method="min", ascending=False)
-
 
 
     plus_minus1_for_position_in_table = 0
@@ -1019,7 +1029,7 @@ def backtest_model(season: str, at_gameweek: int) -> dict:
     }
 
 
-def build_predicted_points_table() -> DataFrame:
+def build_predicted_points_table(repo: PredictionRepository) -> DataFrame:
     '''
     Generates a dataframe with columns [team, points] based on the team distribution, will utilize the median values to find accurate representation of points
     Call get_team_points_distribution(n_sims) where n_sims = 10_000 and then use the dictionary all_value which contains [team, all_points_from_n_simulations] to find the median
@@ -1030,10 +1040,11 @@ def build_predicted_points_table() -> DataFrame:
 
     '''
     # set the indx of the dataframe as the teams
+    current_table = repo.get_current_table()
     league_points_pred = pd.DataFrame({
-        "team": league_table["team"]
+        "team": current_table["team"]
     }).set_index("team")
-    points_distribution = simulate_season(10_000)["points_distribution"]
+    points_distribution = simulate_season(repo, 10_000)["points_distribution"]
     
     for team, points_distribution in points_distribution.items():
         team_points_distribution = get_team_points_distribution(team, points_distribution)
@@ -1044,12 +1055,13 @@ def build_predicted_points_table() -> DataFrame:
     return league_points_pred
 
 
-def get_accuracy_trend(season: str, checkpoints: list[int]) -> list[dict]:
+def get_accuracy_trend(repo: PredictionRepository, season: str, checkpoints: list[int]) -> list[dict]:
     '''
     Get a trend graph for the accuracy page by looping over game weeks in the list
     and calling backtest_model() on each of the checkpoints and return the output of backtest_model
     as a list
     Args:
+        repo: PredictionRepository, threaded through to backtest_model
         season: season to run backtest on
         checkpoints: a list of ints from 0 - 38 representing the game week to run the backtest on
 
@@ -1064,7 +1076,7 @@ def get_accuracy_trend(season: str, checkpoints: list[int]) -> list[dict]:
 
     payload = []
     for game_week in checkpoints:
-        resu = backtest_model(season, game_week)
+        resu = backtest_model(repo, season, game_week)
         payload.append(
             resu
         )
@@ -1073,7 +1085,7 @@ def get_accuracy_trend(season: str, checkpoints: list[int]) -> list[dict]:
     return payload
 
 
-def get_team_error_profile(season: str, at_gameweek: int) -> list[dict]:
+def get_team_error_profile(repo: PredictionRepository, season: str, at_gameweek: int) -> list[dict]:
     '''
     compares predicted vs actual points of each team
     returns the per team error rows
@@ -1090,6 +1102,7 @@ def get_team_error_profile(season: str, at_gameweek: int) -> list[dict]:
     "position_error": 0
   },
     Args:
+        repo: PredictionRepository used to fetch match data, 2024 team stats, and final 2024 table
         season: season to run test on
         at_gameweek: game week cut off
 
@@ -1097,15 +1110,18 @@ def get_team_error_profile(season: str, at_gameweek: int) -> list[dict]:
 
     '''
     # load current season data from database and aggregate by matches so far and matches remaining
-    df_season_data = pd.read_sql_query("SELECT * FROM match_data WHERE season=?", conn, params=(season,))
+    all_match_data = repo.get_match_data()
+    df_season_data = all_match_data[all_match_data["season"] == season]
     matches_so_far = df_season_data[df_season_data["matchweek"] <= at_gameweek]
     matches_remaining = df_season_data[df_season_data["matchweek"] > at_gameweek]
 
     # create the league table from the match data from databse (not predicting just using outcomes to show what the table looked like at matchweek x)
     # simulate the season based on the league table at matchweek x, remaining matches, and the team stats
-    snapshot_of_table = build_table_backtest(matches_so_far)
-    season_simulation_2024 = simulate_season_from_snapshot(snapshot_of_table, matches_remaining, team_stats_2024,
-                                                           10)  # returns the dict with title, top4, and releg. probabilites
+    team_stats_2024 = repo.get_team_stats_2024()
+    league_table_2024_true = repo.get_league_table_2024()
+    snapshot_of_table = build_table_backtest(repo, matches_so_far)
+    season_simulation_2024 = simulate_season_from_snapshot(repo, snapshot_of_table, matches_remaining, team_stats_2024,
+                                                           10_000)  # returns the dict with title, top4, and releg. probabilites
     league_points_predicted_2024 = build_predicted_points_table_from_snapshot(season_simulation_2024, snapshot_of_table)
     league_points_true_2024 = league_table_2024_true[["team", "points"]].set_index('team')
 
@@ -1148,13 +1164,7 @@ def get_data_freshness_metadata() -> dict:
 
 
 
-def main():
-    sims = simulate_season(10)["all_simulations"]
-    print(f"regular sim: {sims}")
-    scen = [{"home": "West Ham", "away": "Leeds", "result": 'home_win'}]
-    scen_sim = simulate_scenario(scen, 10)["all_simulations"]
-
-    # print(f"scenario sim {scen_sim}")
-    
-if __name__ == "__main__":
-    main()
+# def main():
+#
+# if __name__ == "__main__":
+# main()
