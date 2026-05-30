@@ -15,12 +15,12 @@ from services.repository import PredictionRepository
 from services.simulation_config import SimulationConfig, DEFAULT_SIMULATION_CONFIG
 from services.validators import validate_fixture_override
 
-from services.predictions import get_team_probabilities, league_table, backtest_model, get_accuracy_trend
+from services.predictions import get_team_probabilities, backtest_model, get_accuracy_trend
 from services.predictions import simulate_season
 from services.predictions import get_project_final_points
 from services import predictions as pred
 
-
+from services.repository import PredictionRepository
 @dataclass
 class PredictionService:
     repository: PredictionRepository
@@ -35,8 +35,8 @@ class PredictionService:
         Build payload for dashboard page.
         """
         now = datetime.now()
-        sims = simulate_season(simulations, seed)
-        projected = get_project_final_points()
+        sims = simulate_season(self.repository, simulations, seed)
+        projected = get_project_final_points(self.repository)
 
         title_probabilities = sims["title_probabilities"]
         top_4_probs = sims["top_4_probabilities"]
@@ -91,9 +91,12 @@ class PredictionService:
         """
         Build payload for /predictions page and API.
         """
-        team_probabilities = get_team_probabilities(10_000)
-        projected = get_project_final_points()
-        all_points_distribution = simulate_season(10_000, seed)["points_distribution"]
+        league_table = self.repository.get_current_table()
+        simulation_results = simulate_season(self.repository, simulations, seed)
+
+        team_probabilities = get_team_probabilities(self.repository, simulations, simulation_results)
+        projected = get_project_final_points(self.repository)
+        all_points_distribution = simulation_results["points_distribution"]
         projected_table = [
             {
                 "position": int(projected.iat[i, 2]),
@@ -144,7 +147,7 @@ class PredictionService:
 
     def get_upcoming_fixtures(self) -> list[dict[str, Any]]:
         """Build payload for upcoming fixture page."""
-        fixture_df = pred.get_remaining_matches()
+        fixture_df = pred.get_remaining_matches(self.repository)
         payload = []
 
         for index, match in fixture_df.iterrows():
@@ -152,10 +155,6 @@ class PredictionService:
                 "match_date": match["date"],
                 "home_team": match["home_team"],
                 "away_team": match["away_team"],
-                "home_win_prob": match["home_win_prob"],
-                "away_win_prob": match["away_win_prob"],
-                "expected_home_goals": match["expected_home_goals"],
-                "expected_away_goals": match["expected_away_goals"]
             }
             payload.append(entry)
 
@@ -168,11 +167,12 @@ class PredictionService:
         seed: int | None = None,
     ) -> dict[str, Any]:
         """Execute what-if scenario and return deltas against baseline."""
+        league_table = self.repository.get_current_table()
         for scenario in overrides:
             validate_fixture_override(scenario, set(league_table["team"]))
 
-        team_probabilities = pred.get_team_probabilities(simulations)
-        scenario_probabilities = pred.simulate_scenario(overrides, simulations, seed)
+        team_probabilities = pred.get_team_probabilities(self.repository, simulations)
+        scenario_probabilities = pred.simulate_scenario(self.repository, overrides, simulations, seed)
 
         baseline = {
             "title": {
@@ -254,9 +254,9 @@ class PredictionService:
     def get_accuracy_tracking(self, season: str, at_gameweek: int, checkpoints: list[int]) -> dict[str, Any]:
         """Build payload for /accuracy page."""
         freshness = pred.get_data_freshness_metadata()
-        latest = backtest_model(season, at_gameweek)
-        trend = pred.get_accuracy_trend(season, checkpoints)
-        team_error_profile = pred.get_team_error_profile(season, at_gameweek)
+        latest = backtest_model(self.repository, season, at_gameweek)
+        trend = pred.get_accuracy_trend(self.repository, season, checkpoints)
+        team_error_profile = pred.get_team_error_profile(self.repository, season, at_gameweek)
         now = datetime.now()
         return {
             "meta": {
