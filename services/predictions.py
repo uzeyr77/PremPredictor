@@ -613,24 +613,26 @@ def compare_scenario(baseline_results: dict, scenario_results: dict, metric: str
     return df_result
 
 
-def get_team_probabilities(repo: PredictionRepository, n_simulations):
+def get_team_probabilities(repo: PredictionRepository, n_simulations, simulation_result = None):
+    if not simulation_result:
+        simulation_result = simulate_season(repo, n_simulations)
 
-    resu = simulate_season(repo, n_simulations)
     all_team_summary = {}
     current_table = repo.get_current_table()
     for team in current_table["team"]:
         team_summary = {
             "team": team,
-            "title_probability": resu["title_probabilities"][team],
-            "top_2_probabilities": resu["top_2_probabilities"][team],
-            "top_4_probability": resu["top_4_probabilities"][team],
-            "relegation_probabilities": resu["relegation_probabilities"][team]
+            "title_probability": simulation_result["title_probabilities"][team],
+            "top_2_probabilities": simulation_result["top_2_probabilities"][team],
+            "top_4_probability": simulation_result["top_4_probabilities"][team],
+            "relegation_probabilities": simulation_result["relegation_probabilities"][team]
 
 
         }
         all_team_summary[team] = team_summary
 
     return all_team_summary
+
 
 
 def predict_match_backtest(home_team: str, away_team: str, team_data: DataFrame) -> DataFrame:
