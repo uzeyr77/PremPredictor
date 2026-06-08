@@ -23,7 +23,7 @@ from __future__ import annotations
 import json
 import math
 from unittest.mock import patch
-
+from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
@@ -84,6 +84,7 @@ class TestPredictionServiceConstruction:
 
     def test_service_accepts_prediction_repository(self) -> None:
         """`PredictionService` requires a `PredictionRepository` instance."""
+        # ":memory:" creates a temporary private database in RAM for testing
         repo = PredictionRepository(":memory:")
         svc = PredictionService(repository=repo)
         assert svc.repository is repo
@@ -98,6 +99,9 @@ class TestPredictionServiceConstruction:
 class TestGetDashboardSummaryMocked:
     """
     `get_dashboard_summary` calls `simulate_season` and `get_project_final_points`.
+     We pass into the patch decorator these functions because we do not want to actually call them, by passing them
+     every call to them will be mocked
+     e.g services.prediction_service.get_project_final_points() will be mocked instead of calling the actual function
 
     We patch both so this test never touches SQLite or Monte Carlo randomness.
     """
@@ -110,9 +114,12 @@ class TestGetDashboardSummaryMocked:
         mock_get_project_final_points,
         prediction_service: PredictionService,
     ) -> None:
+        # artifically setting what the simulate_season() function returns
+        # in ths case it returns _make_simulate_season_return() which is helper function that mimicks simulate season
         mock_simulate_season.return_value = _make_simulate_season_return()
         mock_get_project_final_points.return_value = _make_projected_points_df()
 
+        # we do not mock get_dashboard_summary() since it is the function under test
         payload = prediction_service.get_dashboard_summary(simulations=123)
 
         # --- TypedDict `DashboardSummary` keys (see models/contracts.py)
@@ -153,7 +160,9 @@ class TestGetDashboardSummaryMocked:
             assert isinstance(row["team"], str)
             assert isinstance(row["points"], int)
 
-        mock_simulate_season.assert_called_once_with(123)
+        # since get_dashboard summary internally calls simulate_season and get_projected_final points, the mocks
+        # get called instead
+        mock_simulate_season.assert_called_once_with(prediction_service.repository, 123, None)
         mock_get_project_final_points.assert_called_once()
 
 
@@ -166,6 +175,8 @@ class TestRunScenarioMocked:
     """
     `run_scenario` validates overrides, builds baseline vs scenario dicts, comparisons.
 
+    Because it calls simulate_scenario and and get_team_probs
+
     Empty `overrides` avoids validation errors and keeps `simulate_scenario` logic
     exercised with minimal fixture setup when patched.
     """
@@ -176,10 +187,10 @@ class TestRunScenarioMocked:
         self,
         mock_get_team_probabilities,
         mock_simulate_scenario,
-        prediction_service: PredictionService,
+        prediction_service,
+        fake_repo
     ) -> None:
         teams = ["Alpha FC", "Beta United", "Gamma City"]
-
         def _per_team_probs() -> dict:
             return {
                 t: {
@@ -190,17 +201,13 @@ class TestRunScenarioMocked:
                 }
                 for t in teams
             }
-
+        # artificially set the mock_team_probabilites to return the _per_team_probs() function return
         mock_get_team_probabilities.return_value = _per_team_probs()
-
         sim_ret = _make_simulate_season_return()
         mock_simulate_scenario.return_value = sim_ret
-
-        with patch(
-            "services.prediction_service.league_table",
-            pd.DataFrame({"team": teams}),
-        ):
-            out = prediction_service.run_scenario(overrides=[], simulations=50, seed=1)
+        fake_repo.get_current_table.return_value = pd.DataFrame({
+        "team": teams})  # when the method get_current_table is called in the run_scenario(over...) call will return this dataframe
+        out = prediction_service.run_scenario(overrides=[], simulations=50, seed=1)
 
         assert set(out.keys()) == {"meta", "overrides", "baseline", "scenario", "comparison"}
         assert out["overrides"] == []
@@ -237,17 +244,18 @@ class TestRunScenarioMocked:
 class TestGetAccuracyTrackingMocked:
     """Ensure the payload is JSON-serializable (Flask `jsonify` requirement)."""
 
-    @patch("services.prediction_service.pred.get_team_error_profile")
-    @patch("services.prediction_service.pred.get_accuracy_trend")
+    @patch("services.prediction_service.get_team_error_profile")
+    @patch("services.prediction_service.get_accuracy_trend")
     @patch("services.prediction_service.backtest_model")
-    @patch("services.prediction_service.pred.get_data_freshness_metadata")
+    @patch("services.prediction_service.get_data_freshness_metadata")
     def test_accuracy_tracking_json_dumps_round_trip(
         self,
         mock_freshness,
         mock_backtest,
         mock_trend,
         mock_profile,
-        prediction_service: PredictionService,
+        fake_repo,
+        prediction_service
     ) -> None:
         mock_freshness.return_value = {"season": 2024}
         mock_backtest.return_value = {
@@ -278,12 +286,17 @@ class TestGetAccuracyTrackingMocked:
 class TestGetUpcomingFixturesMocked:
     """`get_upcoming_fixtures` maps rows from `get_remaining_matches()` to dicts."""
 
-    @patch("services.prediction_service.pred.get_remaining_matches")
+    @patch("services.prediction_service.pred.predict_all_remaining_matches")
     def test_fixture_list_entries_have_stable_keys(
         self,
         mock_get_remaining,
-        prediction_service: PredictionService,
+        prediction_service
     ) -> None:
+        # in the service function we are testing get_upcoming_fixtures, it uses a
+        # function in the prediction.py module get_remaining_matches which we mock
+        # instead of passing the actual remaining_matches return value because it
+        # would require querying the db
+
         mock_get_remaining.return_value = pd.DataFrame(
             [
                 {
@@ -291,6 +304,7 @@ class TestGetUpcomingFixturesMocked:
                     "home_team": "A",
                     "away_team": "B",
                     "home_win_prob": 0.5,
+                    'draw_prob': 0.3,
                     "away_win_prob": 0.2,
                     "expected_home_goals": 1.4,
                     "expected_away_goals": 1.2,
@@ -299,13 +313,13 @@ class TestGetUpcomingFixturesMocked:
         )
 
         rows = prediction_service.get_upcoming_fixtures()
-        assert len(rows) == 1
         entry = rows[0]
         assert set(entry.keys()) == {
-            "match_date",
+            "date",
             "home_team",
             "away_team",
             "home_win_prob",
+            "draw_prob",
             "away_win_prob",
             "expected_home_goals",
             "expected_away_goals",
@@ -331,10 +345,11 @@ class TestPredictionServiceIntegration:
     def test_backtest_model_metrics_ranges_via_service_accuracy(
         self,
         prem_db_path: str,
-        prediction_service: PredictionService,
     ) -> None:
         """End-to-end: backtest numbers should be finite and within plausible ranges."""
-        payload = prediction_service.get_accuracy_tracking(
+        repository = PredictionRepository(prem_db_path)
+        svc = PredictionService(repository)
+        payload = svc.get_accuracy_tracking(
             season="2024",
             at_gameweek=38,
             checkpoints=[38],

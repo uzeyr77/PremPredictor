@@ -7,9 +7,13 @@ Docs: https://docs.pytest.org/en/stable/reference/fixtures.html
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
+import pandas as pd
 import pytest
 
+from services.prediction_service import PredictionService
+from services.repository import PredictionRepository
 
 # Project root = .../PremierLeaguePredictor (parent of tests/)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -47,3 +51,16 @@ def prediction_service(prediction_repository_memory):
     from services.prediction_service import PredictionService
 
     return PredictionService(repository=prediction_repository_memory)
+
+@pytest.fixture
+def fake_repo():
+    repo = MagicMock(spec=PredictionRepository)
+    # default the current_table() to empty dataframe to prevent issues with magicMock()
+    # get._current_table returns a dataframe with empty team and empty points now
+    repo.get_current_table.return_value = pd.DataFrame({'team': [], 'points': []})
+    return repo
+
+@pytest.fixture
+def prediction_service(fake_repo):
+    svc = PredictionService(repository=fake_repo)
+    return svc
