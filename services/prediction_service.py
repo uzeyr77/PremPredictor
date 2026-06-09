@@ -15,7 +15,7 @@ from services.repository import PredictionRepository
 from services.simulation_config import SimulationConfig, DEFAULT_SIMULATION_CONFIG
 from services.validators import validate_fixture_override
 
-from services.predictions import get_team_probabilities, backtest_model, get_accuracy_trend
+from services.predictions import *
 from services.predictions import simulate_season
 from services.predictions import get_project_final_points
 from services import predictions as pred
@@ -37,13 +37,12 @@ class PredictionService:
         now = datetime.now()
         sims = simulate_season(self.repository, simulations, seed)
         projected = get_project_final_points(self.repository)
-
+        current_table = get_current_table(self.repository)
+        upcoming_fixtures = self._upcoming_fixtures()
         title_probabilities = sims["title_probabilities"]
         top_4_probs = sims["top_4_probabilities"]
-
         top3_teams = sorted(title_probabilities, key=title_probabilities.get, reverse=True)[:3]
         top4_teams = sorted(top_4_probs, key=top_4_probs.get, reverse=True)[:4]
-
         title_favs: list[TeamProbabilityRow] = [
             {
                 "team": team,
@@ -71,6 +70,13 @@ class PredictionService:
             for i in range(len(projected))
         ]
 
+        current_table_points = [
+            {
+                "team": row["team"],
+                "points": int(row["points"]),
+            }
+            for index, row in current_table.iterrows()
+        ]
         last_updated = now.strftime("%Y-%m-%d %H:%M:%S")
 
         payload: DashboardSummary = {
@@ -79,6 +85,9 @@ class PredictionService:
             "title_favorites": title_favs,
             "top_4_race": top_4_race,
             "projected_table": projected_table,
+            "current_table_points": current_table_points,
+            "upcoming_fixtures": upcoming_fixtures,
+            "match_of_the_week": upcoming_fixtures[0]
         }
 
         return payload
@@ -145,16 +154,43 @@ class PredictionService:
             "confidence_intervals": confidence_intervals,
         }
 
-    def get_upcoming_fixtures(self) -> list[dict[str, Any]]:
-        """Build payload for upcoming fixture page."""
-        fixture_df = pred.get_remaining_matches(self.repository)
+    def _upcoming_fixtures(self) -> list[dict[str, Any]]:
+        '''Helper function to retrieve upcoming fixtures from db'''
+        # remaining_matches = pred.get_remaining_matches(self.repository)
+        upcoming_fixture_df = pred.predict_all_remaining_matches(self.repository)
         payload = []
 
-        for index, match in fixture_df.iterrows():
+        for index, match in upcoming_fixture_df.iterrows():
             entry = {
-                "match_date": match["date"],
-                "home_team": match["home_team"],
-                "away_team": match["away_team"],
+                'date': match['date'],
+                'home_team': match['home_team'],
+                'away_team': match['away_team'],
+                'home_win_prob': match['home_win_prob'],
+                'draw_prob': match['draw_prob'],
+                'away_win_prob': match['away_win_prob'],
+                'expected_home_goals': match['expected_home_goals'],
+                'expected_away_goals': match['expected_away_goals']
+            }
+            payload.append(entry)
+
+        return payload[:4] # only need the top 4 upcoming fixtures
+
+    def get_upcoming_fixtures(self) -> list[dict[str, Any]]:
+        """Build payload for upcoming fixture page (with predictions)."""
+        # remaining_matches = pred.get_remaining_matches(self.repository)
+        upcoming_fixture_df = pred.predict_all_remaining_matches(self.repository)
+        payload = []
+
+        for index, match in upcoming_fixture_df.iterrows():
+            entry = {
+                'date': match['date'],
+                'home_team': match['home_team'],
+                'away_team': match['away_team'],
+                'home_win_prob': match['home_win_prob'],
+                'draw_prob': match['draw_prob'],
+                'away_win_prob': match['away_win_prob'],
+                'expected_home_goals': match['expected_home_goals'],
+                'expected_away_goals': match['expected_away_goals']
             }
             payload.append(entry)
 
@@ -253,10 +289,10 @@ class PredictionService:
 
     def get_accuracy_tracking(self, season: str, at_gameweek: int, checkpoints: list[int]) -> dict[str, Any]:
         """Build payload for /accuracy page."""
-        freshness = pred.get_data_freshness_metadata()
+        freshness = get_data_freshness_metadata()
         latest = backtest_model(self.repository, season, at_gameweek)
-        trend = pred.get_accuracy_trend(self.repository, season, checkpoints)
-        team_error_profile = pred.get_team_error_profile(self.repository, season, at_gameweek)
+        trend = get_accuracy_trend(self.repository, season, checkpoints)
+        team_error_profile = get_team_error_profile(self.repository, season, at_gameweek)
         now = datetime.now()
         return {
             "meta": {

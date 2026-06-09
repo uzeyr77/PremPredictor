@@ -12,6 +12,8 @@ LEAGUE_AVERAGE_GOALS = 1.4
 HOME_ADVANTAGE_2024 = 1.0648
 LEAGUE_AVERAGE_GOALS_2024 = 1.467
 
+
+
 def get_remaining_matches(repo: PredictionRepository) -> pd.DataFrame:
    match_data = repo.get_match_data()
    remaining_matches = match_data[match_data.played == 0]
@@ -1164,8 +1166,22 @@ def get_data_freshness_metadata() -> dict:
       "played_matches": 380
     }
 
+def get_recent_form(repo:PredictionRepository, n: int = 5) -> DataFrame:
 
+    played = repo.get_match_data()
+    played = played[played["played"] == 1].sort_values(["matchweek", "date"])
+    rows = []
+    for _, m in played.iterrows():
+        if m["home_goals"] > m["away_goals"]:
+            rows += [{"team": m["home_team"], "result": "W"}, {"team": m["away_team"], "result": "L"}]
+        elif m["home_goals"] < m["away_goals"]:
+            rows += [{"team": m["home_team"], "result": "L"}, {"team": m["away_team"], "result": "W"}]
+        else:
+            rows += [{"team": m["home_team"], "result": "D"}, {"team": m["away_team"], "result": "D"}]
 
+    form_df = pd.DataFrame(rows).groupby("team")["result"].apply(lambda s: s.tail(n).tolist())
+
+    return form_df
 # def main():
 #
 # if __name__ == "__main__":
