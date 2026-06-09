@@ -24,7 +24,7 @@ class PredictionRepository:
             conn.close()
 
     def assert_required_tables(self) -> None:
-        required = {"league_table_2025", "match_data", "prem_teams_2025"}
+        required = {"league_table_2025", "match_data", "prem_teams_2025", "league_table_2024_final", "prem_teams_2024"}
         with self._connect() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT name FROM sqlite_master WHERE type= 'table';")
@@ -46,3 +46,26 @@ class PredictionRepository:
     def get_match_data(self) -> pd.DataFrame:
         with self._connect() as conn:
             return pd.read_sql_query("SELECT * FROM match_data", conn)
+
+    def get_team_stats_2024(self) -> pd.DataFrame:
+        with self._connect() as conn:
+            return pd.read_sql_query("SELECT * FROM prem_teams_2024", conn)
+
+    def get_league_table_2024(self) -> pd.DataFrame:
+        with self._connect() as conn:
+            return pd.read_sql_query("SELECT * FROM league_table_2024_final", conn)
+
+    def get_matchweek(self) -> int:
+        played = self.get_match_data()
+        played = played[played['season'] == 2025]
+        played = played[played['played'] == 1]
+        if len(played) == 0:
+            return 1
+        else:
+            last_match = played.tail(1)
+            return int(last_match['matchweek'].max())
+
+    def get_latest_upcoming_match(self):
+        matches = self.get_match_data()
+
+        return matches.tail(1)
