@@ -1,12 +1,87 @@
 {% extends "base.html" %}
+
+{% block title %}Upcoming Fixtures - PremPredictor{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-  <h1>Upcoming Fixtures</h1>
-  <p>
-    Boilerplate page for remaining fixtures and probabilities.
-    Replace this placeholder with a table/cards once
-    <code>PredictionService.get_upcoming_fixtures()</code> is implemented.
-  </p>
+<div class="container py-4">
+
+  <div class="d-flex justify-content-between align-items-end mb-4 flex-wrap gap-2">
+    <div>
+      <h1 class="mb-1">Upcoming Fixtures</h1>
+      <p class="text-muted mb-0">
+        Remaining matches for the 2025/2026 season.
+      </p>
+    </div>
+    <span class="badge bg-secondary fs-6">
+      {{ fixtures | length }} match{{ "es" if fixtures | length != 1 else "" }}
+    </span>
+  </div>
+
+  {% if not fixtures %}
+    <div class="alert alert-info" role="alert">
+      <h5 class="alert-heading mb-1">No upcoming fixtures</h5>
+      <p class="mb-0">
+        Either the season is over or the database has no scheduled matches yet.
+      </p>
+    </div>
+  {% else %}
+
+    {% set has_probs = fixtures[0].home_win_prob is defined %}
+    {% set has_xg    = fixtures[0].expected_home_goals is defined %}
+
+    {% for match_date, day_fixtures in fixtures | groupby("match_date") %}
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-body-tertiary">
+          <strong>{{ match_date }}</strong>
+          <span class="text-muted small">
+            ({{ day_fixtures | length }} match{{ "es" if day_fixtures | length != 1 else "" }})
+          </span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th scope="col" class="text-end">Home</th>
+                <th scope="col" class="text-center" style="width: 4rem;">vs</th>
+                <th scope="col">Away</th>
+                {% if has_probs %}
+                  <th scope="col" class="text-center">Home Win %</th>
+                  <th scope="col" class="text-center">Away Win %</th>
+                {% endif %}
+                {% if has_xg %}
+                  <th scope="col" class="text-center">xG (H - A)</th>
+                {% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for match in day_fixtures %}
+                <tr>
+                  <td class="text-end fw-semibold">{{ match.home_team }}</td>
+                  <td class="text-center text-muted">vs</td>
+                  <td class="fw-semibold">{{ match.away_team }}</td>
+                  {% if has_probs %}
+                    <td class="text-center">
+                      {{ "%.0f"|format(match.home_win_prob * 100) }}%
+                    </td>
+                    <td class="text-center">
+                      {{ "%.0f"|format(match.away_win_prob * 100) }}%
+                    </td>
+                  {% endif %}
+                  {% if has_xg %}
+                    <td class="text-center text-muted small">
+                      {{ "%.2f"|format(match.expected_home_goals) }}
+                      -
+                      {{ "%.2f"|format(match.expected_away_goals) }}
+                    </td>
+                  {% endif %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endfor %}
+
+  {% endif %}
 </div>
 {% endblock %}
-

@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+
 from pandas.core.interchange.dataframe_protocol import DataFrame
 from scipy.stats import poisson
 from sklearn.metrics import mean_absolute_error
@@ -11,8 +12,23 @@ HOME_ADVANTAGE = 1.3
 LEAGUE_AVERAGE_GOALS = 1.4
 HOME_ADVANTAGE_2024 = 1.0648
 LEAGUE_AVERAGE_GOALS_2024 = 1.467
-
-
+# Team names must match match_data.home_team / away_team exactly (see prem_data.db).
+DERBIES = {
+    frozenset(["Arsenal", "Tottenham"]): "North London Derby",
+    frozenset(["Man City", "Man United"]): "Manchester Derby",
+    frozenset(["Liverpool", "Everton"]): "Merseyside Derby",
+    frozenset(["Chelsea", "Fulham"]): "West London Derby",
+    frozenset(["Newcastle", "Sunderland"]): "Tyne-Wear Derby",
+}
+MIN_EXPECTED_SWING = 0.02  # below this, no critical match is returned
+SWING_SIMULATIONS_CAP = 500  # scenario sims for swing/stakes (faster than full dashboard sims)
+OUTCOMES = ["home_win", "draw", "away_win"]
+METRICS = ["title", "top_4", "relegation"]
+RACE_LABELS = {
+    "title": "Title Race",
+    "top_4": "Top-4 Race",
+    "relegation": "Relegation Race",
+}
 
 def get_remaining_matches(repo: PredictionRepository) -> pd.DataFrame:
    match_data = repo.get_match_data()
@@ -211,9 +227,6 @@ def predict_match(repo: PredictionRepository, home_team: str, away_team: str):
         "expected_home_goals": float(exp_home_goals),
         "expected_away_goals": float(exp_away_goals)
     }
-    # print("home win:", home_win_prob)  
-    # print("home win:", away_win_prob) 
-    # print("draw prob:", draw_prob)       
     return resu
 
 def predict_all_remaining_matches(repo: PredictionRepository):
@@ -303,7 +316,6 @@ def simulate_season(repo: PredictionRepository, n_simulations, seed=None):
     remaining_fixtures = predict_all_remaining_matches(repo)
     teams = current_table['team'].tolist()
     points_distribution = {team: [] for team in teams}
-    # print(current_points)
     for sim in range(n_simulations):
         sim_points = current_points.copy()
         if sim % 1000 == 0:
@@ -1166,10 +1178,11 @@ def get_data_freshness_metadata() -> dict:
       "played_matches": 380
     }
 
-def get_recent_form(repo:PredictionRepository, n: int = 5) -> DataFrame:
-
+def get_recent_form(repo: PredictionRepository, n: int = 5) -> pd.Series:
+    """Last n W/D/L results per team from played matches in the current season."""
     played = repo.get_match_data()
-    played = played[played["played"] == 1].sort_values(["matchweek", "date"])
+    played = played[(played["season"] == 2025) & (played["played"] == 1)]
+    played = played.sort_values(["matchweek", "date"])
     rows = []
     for _, m in played.iterrows():
         if m["home_goals"] > m["away_goals"]:
@@ -1179,9 +1192,362 @@ def get_recent_form(repo:PredictionRepository, n: int = 5) -> DataFrame:
         else:
             rows += [{"team": m["home_team"], "result": "D"}, {"team": m["away_team"], "result": "D"}]
 
-    form_df = pd.DataFrame(rows).groupby("team")["result"].apply(lambda s: s.tail(n).tolist())
+    if not rows:
+        return pd.Series(dtype=object)
 
+    form_df = pd.DataFrame(rows).groupby("team")["result"].apply(lambda s: s.tail(n).tolist())
     return form_df
+
+
+def form_ppg_from_results(results: list[str]) -> float:
+    if not results:
+        return 0.0
+    points = sum(3 if r == "W" else 1 if r == "D" else 0 for r in results)
+    return round(points / len(results), 2)
+
+
+def get_team_form_snapshot(repo: PredictionRepository, team: str, n: int = 5) -> dict:
+    form_series = get_recent_form(repo, n)
+    results = form_series.get(team, [])
+    if isinstance(results, pd.Series):
+        results = results.tolist()
+    return {
+        "team": team,
+        "form": list(results),
+        "ppg": form_ppg_from_results(list(results)),
+    }
+
+
+def get_form_pulse(repo: PredictionRepository, n: int = 5, limit: int = 5) -> dict:
+    """Rank teams by recent form points-per-game."""
+    form_series = get_recent_form(repo, n)
+    rows = [
+        {
+            "team": team,
+            "form": list(results),
+            "ppg": form_ppg_from_results(list(results)),
+        }
+        for team, results in form_series.items()
+    ]
+    rows.sort(key=lambda row: row["ppg"], reverse=True)
+    cold = sorted(rows, key=lambda row: row["ppg"])[:limit]
+    return {"in_form": rows[:limit], "cold": cold}
+
+
+def get_head_to_head(
+    repo: PredictionRepository,
+    home_team: str,
+    away_team: str,
+    perspective_team: str,
+    n: int = 5,
+) -> list[str]:
+    """Last n meetings from one team's perspective (W/D/L)."""
+    played = repo.get_match_data()
+    played = played[(played["season"] == 2025) & (played["played"] == 1)]
+    mask = (
+        ((played["home_team"] == home_team) & (played["away_team"] == away_team))
+        | ((played["home_team"] == away_team) & (played["away_team"] == home_team))
+    )
+    meetings = played[mask].sort_values(["matchweek", "date"]).tail(n)
+    results: list[str] = []
+    for _, m in meetings.iterrows():
+        if m["home_team"] == perspective_team:
+            gf, ga = m["home_goals"], m["away_goals"]
+        else:
+            gf, ga = m["away_goals"], m["home_goals"]
+        if gf > ga:
+            results.append("W")
+        elif gf < ga:
+            results.append("L")
+        else:
+            results.append("D")
+    return results
+
+def get_featured_fixture_pool(repo: PredictionRepository) -> list[dict]:
+    remaining_matches = get_remaining_matches(repo)
+    remaining_matches = remaining_matches[remaining_matches['season'] == 2025]
+    curr_mw = repo.get_matchweek()
+
+    current_week = remaining_matches[remaining_matches['matchweek'] == curr_mw]
+    next_week = remaining_matches[remaining_matches['matchweek'] == curr_mw + 1]
+    if len(current_week) == 0:
+        pool = next_week
+    elif len(current_week) < 3:
+        pool = pd.concat([current_week, next_week], ignore_index=True)
+    else:
+        pool = current_week
+    if pool.empty:
+        return []
+
+    # predictions
+    results = []
+    for _, row in pool.iterrows():
+        probs = predict_match(repo, row['home_team'], row['away_team'])
+        results.append(
+            { "matchweek": int(row['matchweek']),
+              'date': row['date'],
+              'home_team': row['home_team'],
+              'away_team': row['away_team'],
+              'home_win_prob': probs['home_win_prob'],
+              'draw_prob': probs['draw_prob'],
+              'away_win_prob': probs['away_win_prob'],
+              'expected_home_goals': probs['expected_home_goals'],
+              'expected_away_goals': probs['expected_away_goals']
+            })
+
+    return results
+
+def find_derby_in_fixtures(home_team: str, away_team: str) -> str | None:
+    return DERBIES.get(frozenset({home_team, away_team}))
+
+
+def pick_derby_from_pool(pool: list[dict]) -> dict | None:
+    """Return the first derby fixture in the pool, with badge attached."""
+    for fixture in pool:
+        label = find_derby_in_fixtures(fixture["home_team"], fixture["away_team"])
+        if label:
+            return {**fixture, "badge": label}
+    return None
+
+
+def pick_big_match(fixtures: list, current_table: DataFrame, top_n=6) -> dict | None:
+    sorted_table = current_table.sort_values("points", ascending=False).reset_index(drop=True)
+    top_teams = set(sorted_table.head(top_n)["team"])
+    positions = {
+        row["team"]: i + 1
+        for i, row in sorted_table.iterrows()
+    }
+
+    top_clashes = [
+        fixture
+        for fixture in fixtures
+        if fixture["home_team"] in top_teams and fixture["away_team"] in top_teams
+    ]
+
+    if not top_clashes:
+        return None
+
+    best_fixture = min(
+        top_clashes,
+        key=lambda f: positions[f["home_team"]] + positions[f["away_team"]],
+    )
+    return {**best_fixture, "badge": "Top 6 clash"}
+
+
+def annotate_upcoming_fixtures(fixtures: list[dict], limit: int = 4) -> list[dict]:
+    """Add favourite pick label for sidebar cards."""
+    annotated = []
+    for fixture in fixtures[:limit]:
+        home_p = fixture["home_win_prob"]
+        away_p = fixture["away_win_prob"]
+        draw_p = fixture["draw_prob"]
+        max_p = max(home_p, away_p, draw_p)
+        if max_p == home_p:
+            pick = fixture["home_team"]
+        elif max_p == away_p:
+            pick = fixture["away_team"]
+        else:
+            pick = "Toss-up"
+        annotated.append({**fixture, "pick": pick})
+    return annotated
+
+
+def build_rich_projected_table(
+    repo: PredictionRepository,
+    simulation_result: dict,
+    projected: pd.DataFrame,
+    top_n: int = 5,
+    bottom_n: int = 3,
+) -> list[dict]:
+    """Merge current points, projected points, and sim probabilities for dashboard table."""
+    current_table = repo.get_current_table()
+    current_points = {row["team"]: int(row["points"]) for _, row in current_table.iterrows()}
+    title_probs = simulation_result["title_probabilities"]
+    top4_probs = simulation_result["top_4_probabilities"]
+    releg_probs = simulation_result["relegation_probabilities"]
+
+    rows = []
+    for _, row in projected.iterrows():
+        team = row.iloc[0]
+        proj_pts = int(row.iloc[1])
+        position = int(row.iloc[2])
+        rows.append(
+            {
+                "position": position,
+                "team": team,
+                "current_points": current_points.get(team, 0),
+                "projected_points": proj_pts,
+                "title_probability": float(title_probs.get(team, 0.0)),
+                "top_4_probability": float(top4_probs.get(team, 0.0)),
+                "relegation_probability": float(releg_probs.get(team, 0.0)),
+            }
+        )
+
+    rows.sort(key=lambda r: r["position"])
+    if len(rows) <= top_n + bottom_n:
+        return rows
+
+    top_rows = rows[:top_n]
+    bottom_rows = rows[-bottom_n:]
+    return top_rows + [{"is_separator": True, "label": "mid-table"}] + bottom_rows
+
+
+def score_fixture_swing_by_metric(
+    repo: PredictionRepository,
+    baseline: dict,
+    fixture: dict,
+    sims: int,
+    seed: int | None,
+) -> dict[str, float]:
+    """Expected probability swing per race metric for one fixture."""
+    home, away = fixture["home_team"], fixture["away_team"]
+    weights = {
+        "home_win": fixture["home_win_prob"],
+        "draw": fixture["draw_prob"],
+        "away_win": fixture["away_win_prob"],
+    }
+    swing_sims = min(sims, SWING_SIMULATIONS_CAP)
+    scores = {metric: 0.0 for metric in METRICS}
+
+    for outcome, weight in weights.items():
+        scenario = simulate_scenario(
+            repo,
+            [{"home": home, "away": away, "result": outcome}],
+            n_simulations=swing_sims,
+            seed=seed,
+        )
+        for metric in METRICS:
+            df = compare_scenario(baseline, scenario, metric)
+            scores[metric] += weight * float(df["change"].abs().max())
+
+    return scores
+
+
+def analyze_pool_swings(
+    repo: PredictionRepository,
+    pool: list[dict],
+    baseline: dict,
+    sims: int,
+    seed: int | None,
+    min_swing: float = MIN_EXPECTED_SWING,
+) -> tuple[dict | None, list[dict]]:
+    """Score every pool fixture once; return overall critical match + per-race cards."""
+    if not pool:
+        return None, []
+
+    analyzed = []
+    for fixture in pool:
+        by_metric = score_fixture_swing_by_metric(repo, baseline, fixture, sims, seed)
+        expected_swing = max(by_metric.values())
+        analyzed.append({"fixture": fixture, "by_metric": by_metric, "expected_swing": expected_swing})
+
+    best_overall = max(analyzed, key=lambda row: row["expected_swing"])
+    critical_match = None
+    if best_overall["expected_swing"] >= min_swing:
+        critical_match = {
+            **best_overall["fixture"],
+            "badge": "Most consequential",
+            "expected_swing": round(best_overall["expected_swing"], 4),
+        }
+
+    critical_games: list[dict] = []
+    for metric in METRICS:
+        best_for_race = max(analyzed, key=lambda row: row["by_metric"][metric])
+        swing = best_for_race["by_metric"][metric]
+        if swing < min_swing:
+            continue
+        fx = best_for_race["fixture"]
+        critical_games.append(
+            {
+                **fx,
+                "race": RACE_LABELS[metric],
+                "metric": metric,
+                "swing": round(swing, 4),
+                "badge": RACE_LABELS[metric],
+            }
+        )
+
+    return critical_match, critical_games
+
+
+def get_match_stakes(
+    repo: PredictionRepository,
+    baseline: dict,
+    fixture: dict,
+    sims: int,
+    seed: int | None,
+    limit: int = 3,
+) -> list[dict]:
+    """Top probability movers for the hero match card stakes bar."""
+    home, away = fixture["home_team"], fixture["away_team"]
+    swing_sims = min(sims, SWING_SIMULATIONS_CAP)
+    outcome_labels = {
+        "home_win": f"{home} win",
+        "draw": "Draw",
+        "away_win": f"{away} win",
+    }
+    stakes: list[dict] = []
+
+    for outcome in OUTCOMES:
+        scenario = simulate_scenario(
+            repo,
+            [{"home": home, "away": away, "result": outcome}],
+            n_simulations=swing_sims,
+            seed=seed,
+        )
+        for metric in ("title", "top_4"):
+            df = compare_scenario(baseline, scenario, metric)
+            top = df.iloc[0]
+            stakes.append(
+                {
+                    "race": RACE_LABELS[metric],
+                    "description": outcome_labels[outcome],
+                    "team": top["team"],
+                    "delta": round(float(top["change"]) * 100, 1),
+                }
+            )
+
+    stakes.sort(key=lambda row: abs(row["delta"]), reverse=True)
+    return stakes[:limit]
+
+
+def pick_hero_match(featured_matches: dict) -> dict | None:
+    """Prefer critical, then top-6 clash, then derby for the main hero card."""
+    return (
+        featured_matches.get("critical_match")
+        or featured_matches.get("big_match")
+        or featured_matches.get("derby")
+    )
+
+
+def build_hero_match(
+    repo: PredictionRepository,
+    featured_matches: dict,
+    baseline: dict,
+    sims: int,
+    seed: int | None,
+) -> dict | None:
+    """Full hero card: fixture, form, H2H, and stakes."""
+    hero = pick_hero_match(featured_matches)
+    if hero is None:
+        return None
+
+    return {
+        **hero,
+        "head_to_head": get_head_to_head(
+            repo,
+            hero["home_team"],
+            hero["away_team"],
+            perspective_team=hero["home_team"],
+        ),
+        "home_form": get_team_form_snapshot(repo, hero["home_team"]),
+        "away_form": get_team_form_snapshot(repo, hero["away_team"]),
+        "stakes": get_match_stakes(repo, baseline, hero, sims, seed),
+    }
+
+
+
+
 # def main():
 #
 # if __name__ == "__main__":

@@ -1,7 +1,7 @@
 import pandas as pd
 import sqlite3
 #load matches
-conn = sqlite3.connect("C:/Users/uzeyr/PremierLeaguePredictor/prem_data.db")
+conn = sqlite3.connect("/prem_data.db")
 cursor = conn.cursor()
 matches = pd.read_sql("SELECT * FROM match_data WHERE season = 2025 AND played = 1", conn)
 cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'")

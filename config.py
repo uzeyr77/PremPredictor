@@ -13,6 +13,9 @@ Environment variables:
 
 from dataclasses import dataclass
 import os
+from dotenv import load_dotenv
+load_dotenv() # load env variables into os.environ
+
 
 
 @dataclass(frozen=True)
@@ -22,8 +25,9 @@ class AppConfig:
     db_path: str
     default_simulations: int
     default_seed: int | None
-
-
+    default_gameweek_backtest: int
+    default_season_backtest: str
+    default_checkpoints: list[int]
 def load_config() -> AppConfig:
     flask_env = os.getenv("FLASK_ENV", "development")
     flask_debug = os.getenv("FLASK_DEBUG", "1") == "1"
@@ -35,7 +39,7 @@ def load_config() -> AppConfig:
     elif flask_env == "production":
         default_simulations = 10_000
     else:
-        default_simulations = 2_000
+        default_simulations = 10
     raw_seed = os.getenv("PLP_DEFAULT_SEED")
     default_seed = int(raw_seed) if raw_seed is not None else None
 
@@ -45,4 +49,7 @@ def load_config() -> AppConfig:
         db_path=db_path,
         default_simulations=default_simulations,
         default_seed=default_seed,
+        default_gameweek_backtest=17, # right in the middle of the season
+        default_season_backtest="2024", # season to backtest on
+        default_checkpoints = [5,10,15,20,25]
     )

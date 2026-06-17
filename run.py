@@ -4,9 +4,9 @@ Development entrypoint for the Premier League Predictor web app.
 Run from project root:
   python run.py
 """
-
+from dotenv import load_dotenv
+load_dotenv()
 from app_factory import create_app
-
 
 app = create_app()
 

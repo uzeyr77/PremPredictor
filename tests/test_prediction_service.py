@@ -106,29 +106,61 @@ class TestGetDashboardSummaryMocked:
     We patch both so this test never touches SQLite or Monte Carlo randomness.
     """
 
+    @patch("services.prediction_service.build_hero_match")
+    @patch("services.prediction_service.get_form_pulse")
+    @patch("services.prediction_service.analyze_pool_swings")
+    @patch("services.prediction_service.build_rich_projected_table")
+    @patch("services.prediction_service.annotate_upcoming_fixtures")
+    @patch("services.prediction_service.pick_derby_from_pool")
+    @patch("services.prediction_service.pick_big_match")
+    @patch("services.prediction_service.get_featured_fixture_pool")
     @patch("services.prediction_service.get_project_final_points")
     @patch("services.prediction_service.simulate_season")
     def test_dashboard_payload_matches_dashboard_summary_contract(
         self,
         mock_simulate_season,
         mock_get_project_final_points,
+        mock_get_featured_fixture_pool,
+        mock_pick_big_match,
+        mock_pick_derby_from_pool,
+        mock_annotate_upcoming_fixtures,
+        mock_build_rich_projected_table,
+        mock_analyze_pool_swings,
+        mock_get_form_pulse,
+        mock_build_hero_match,
         prediction_service: PredictionService,
     ) -> None:
-        # artifically setting what the simulate_season() function returns
-        # in ths case it returns _make_simulate_season_return() which is helper function that mimicks simulate season
         mock_simulate_season.return_value = _make_simulate_season_return()
         mock_get_project_final_points.return_value = _make_projected_points_df()
+        prediction_service.repository.get_current_table.return_value = pd.DataFrame(
+            {"team": ["Alpha FC", "Beta United", "Gamma City"], "points": [70, 65, 60]}
+        )
+        prediction_service.repository.get_matchweek.return_value = 38
+        mock_get_featured_fixture_pool.return_value = []
+        mock_pick_big_match.return_value = None
+        mock_pick_derby_from_pool.return_value = None
+        mock_analyze_pool_swings.return_value = (None, [])
+        mock_annotate_upcoming_fixtures.return_value = []
+        mock_build_rich_projected_table.return_value = []
+        mock_get_form_pulse.return_value = {"in_form": [], "cold": []}
+        mock_build_hero_match.return_value = None
 
-        # we do not mock get_dashboard_summary() since it is the function under test
         payload = prediction_service.get_dashboard_summary(simulations=123)
 
-        # --- TypedDict `DashboardSummary` keys (see models/contracts.py)
         assert set(payload.keys()) == {
             "last_updated",
             "simulation_count",
+            "meta",
             "title_favorites",
             "top_4_race",
+            "relegation_race",
             "projected_table",
+            "upcoming_fixtures",
+            "featured_matches",
+            "featured_spotlights",
+            "critical_games",
+            "hero_match",
+            "form_pulse",
         }
 
         # Echo simulation count from the argument, not the mock return value.
@@ -151,19 +183,21 @@ class TestGetDashboardSummaryMocked:
         assert isinstance(payload["top_4_race"], list)
         assert len(payload["top_4_race"]) <= 4
 
-        # --- projected_table: list of dict rows
-        assert isinstance(payload["projected_table"], list)
-        assert len(payload["projected_table"]) == 3
-        for row in payload["projected_table"]:
-            assert set(row.keys()) == {"position", "team", "points"}
-            assert isinstance(row["position"], int)
-            assert isinstance(row["team"], str)
-            assert isinstance(row["points"], int)
+        assert isinstance(payload["relegation_race"], list)
+        assert len(payload["relegation_race"]) <= 3
 
-        # since get_dashboard summary internally calls simulate_season and get_projected_final points, the mocks
-        # get called instead
+        assert isinstance(payload["featured_spotlights"], list)
+
+        # --- projected_table: list of dict rows (mocked empty in this test)
+        assert isinstance(payload["projected_table"], list)
+
+        featured = payload["featured_matches"]
+        assert set(featured.keys()) == {"big_match", "derby", "critical_match"}
+        assert payload["meta"]["matchweek"] == 38
+
         mock_simulate_season.assert_called_once_with(prediction_service.repository, 123, None)
         mock_get_project_final_points.assert_called_once()
+        mock_analyze_pool_swings.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

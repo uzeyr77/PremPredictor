@@ -15,59 +15,6 @@ from __future__ import annotations
 from typing import Any
 from flask import abort, request
 
-
-def _simulations_from_request(default: int) -> int:
-    """
-    Read ``?simulations=`` from the query string, or use *default*.
-
-    Rules:
-    - If the client omits ``simulations``, return *default* (from AppConfig).
-    - If the client sends ``simulations`` but it is not a valid integer,
-      respond with HTTP 400 (bad request).
-
-    Why 400? The client sent malformed input; that is their mistake, not a
-    server bug (500).
-    """
-    # ``in request.args`` is True only when the key appears in the query string.
-    # That distinguishes "missing" from "present but wrong" when we need to.
-    if "simulations" not in request.args:
-        return default
-
-    # Raw value is still a string, e.g. "5000" or "not_a_number".
-    raw = request.args.get("simulations", type=str)
-    if raw is None or raw.strip() == "":
-        abort(400, description="Query parameter 'simulations' must be a non-empty integer.")
-
-    try:
-        value = int(raw)
-    except ValueError:
-        abort(400, description=f"Query parameter 'simulations' must be an integer, got {raw!r}.")
-
-    if value < 1:
-        abort(400, description="Query parameter 'simulations' must be at least 1.")
-
-    return value
-
-
-def _seed_from_request(default: int | None) -> int | None:
-    """
-    Read optional ``?seed=`` from the query string, or use *default*.
-
-    *default* is often ``None`` (no fixed seed — Monte Carlo varies run to run).
-    If the client sends ``seed``, it must be a valid integer.
-    """
-    if "seed" not in request.args:
-        return default
-
-    raw = request.args.get("seed", type=str)
-    if raw is None or raw.strip() == "":
-        abort(400, description="Query parameter 'seed' must be a non-empty integer if provided.")
-
-    try:
-        return int(raw)
-    except ValueError:
-        abort(400, description=f"Query parameter 'seed' must be an integer, got {raw!r}.")
-
 def _override_fixtures_from_request(default: list[dict[str, Any] | None]):
 
     if "overrides" not in request.args:
@@ -82,3 +29,83 @@ def _override_fixtures_from_request(default: list[dict[str, Any] | None]):
         return raw
     except ValueError:
         abort(400, description=f"Query parameter 'overrides' must be an list, got {raw!r}.")
+
+def _accuracy_gameweek_from_request(default: int):
+    '''
+    Read optional ``?gameweek=`` from the query string, or use *default*.
+    Args:
+        default: set in the config module, will be midway through season (gameweek = 17)
+
+    Returns: parsed integer for gameweek from query
+    '''
+
+    if "gameweek" not in request.args:
+        return default
+
+    raw = request.args.get("gameweek", type=str)
+    if raw is None or raw.strip() == "":
+        abort(400, description="Query parameter 'gameweek' must be a non-empty string if provided.")
+    try:
+        return str(raw)
+    except ValueError:
+        abort(400, description=f"Query parameter 'gameweek' must be an int, got {raw!r}.")
+
+
+def _accuracy_season_from_request(default: str):
+    """
+    Read optional ``?season=`` from the query string, or use *default*.
+
+    Args:
+        default: default season string such as "2024"
+
+    Returns:
+        Validated season string.
+    """
+
+    if "season" not in request.args:
+        return default
+
+    raw = request.args.get("season")
+
+    if raw is None or raw.strip() == "":
+        abort(
+            400,
+            description="Query parameter 'season' must be a non-empty string if provided."
+        )
+
+    raw = raw.strip()
+
+    try:
+        if int(raw) >= 2025:
+            abort(
+                400,
+                description="Query parameter 'season' must be prior to the 2025 season."
+            )
+    except ValueError:
+        abort(
+            400,
+            description=f"Query parameter 'season' must be a string representing a year, got {raw!r}."
+        )
+
+    return raw
+def _accuracy_checkpoints_from_request(default: list[int]) -> list[int]:
+    '''
+    Read optional ``?checkpoints=`` from the query string, or use *default*.
+    Args: default checkpoints e.i [5, 10, 15, 20]
+
+    Returns: validated checkpoints list
+    '''
+
+    checkpoints = request.args.get("checkpoints")
+    # 1. Check if empty, could return defaults here if is empty
+    if not checkpoints:
+        abort(400, description="List of checkpoints should not be empty")
+
+    # 2. Type validation (ensure they are integers)
+    try:
+        validate_checkpoints = [int(i) for i in checkpoints]
+    except ValueError:
+        abort(400, description="All checkpoints must be integers")
+
+    checkpoints = [int(x) for x in checkpoints]
+    return checkpoints

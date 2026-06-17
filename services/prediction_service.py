@@ -5,92 +5,78 @@ Service orchestration layer for Flask routes.
 - `services.predictions` = engine math
 - This module = JSON/template-facing orchestration
 """
-
+import json
 from dataclasses import dataclass
 from typing import Any
-from datetime import datetime
+from datetime import datetime, timezone
 
-from models.contracts import DashboardSummary, TeamProbabilityRow
-from services.repository import PredictionRepository
-from services.simulation_config import SimulationConfig, DEFAULT_SIMULATION_CONFIG
+from config import AppConfig
+from models.contracts import (
+    DashboardMeta,
+    DashboardSummary,
+    FeaturedMatchCard,
+    FeaturedMatches,
+    HeroMatchCard,
+    TeamProbabilityRow,
+)
+
 from services.validators import validate_fixture_override
 
 from services.predictions import *
-from services.predictions import simulate_season
-from services.predictions import get_project_final_points
-from services import predictions as pred
-
 from services.repository import PredictionRepository
+
+
+def _fixture_pair(fixture: dict | None) -> tuple[str, str] | None:
+    if not fixture:
+        return None
+    return fixture["home_team"], fixture["away_team"]
+
+
+def build_featured_spotlights(
+    featured_matches: FeaturedMatches,
+    hero_match: HeroMatchCard | None,
+) -> list[FeaturedMatchCard]:
+    """Big-match and derby cards that are not already the hero fixture."""
+    hero_pair = _fixture_pair(hero_match)
+    spotlights: list[FeaturedMatchCard] = []
+    for key in ("big_match", "derby"):
+        match = featured_matches.get(key)
+        if match and _fixture_pair(match) != hero_pair:
+            spotlights.append(match)
+    return spotlights
+
+
 @dataclass
 class PredictionService:
     repository: PredictionRepository
-    simulation_config: SimulationConfig = DEFAULT_SIMULATION_CONFIG
+    config: AppConfig
 
     def get_dashboard_summary(
         self,
-        simulations: int,
-        seed: int | None = None,
     ) -> DashboardSummary:
-        """
-        Build payload for dashboard page.
-        """
-        now = datetime.now()
-        sims = simulate_season(self.repository, simulations, seed)
-        projected = get_project_final_points(self.repository)
-        current_table = get_current_table(self.repository)
-        upcoming_fixtures = self._upcoming_fixtures()
-        title_probabilities = sims["title_probabilities"]
-        top_4_probs = sims["top_4_probabilities"]
-        top3_teams = sorted(title_probabilities, key=title_probabilities.get, reverse=True)[:3]
-        top4_teams = sorted(top_4_probs, key=top_4_probs.get, reverse=True)[:4]
-        title_favs: list[TeamProbabilityRow] = [
-            {
-                "team": team,
-                "title_probability": title_probabilities[team],
-                "top_4_probability": top_4_probs[team],
-            }
-            for team in top3_teams
-        ]
+        """Build the full dashboard payload for `/` and `/api/dashboard`."""
+        fp = self.repository.db_fingerprint()
+        cache = self.repository.get_cached_payload('dashboard')
+        sims = self.config.default_simulations
+        seed = self.config.default_seed
+        # if the cache is found in the table, and it matches the current fingerprint, and it is not expired
+        # then it is a cache hit and there is no compute required
 
-        top_4_race: list[TeamProbabilityRow] = [
-            {
-                "team": team,
-                "title_probability": title_probabilities[team],
-                "top_4_probability": top_4_probs[team],
-            }
-            for team in top4_teams
-        ]
+        if cache and fp == cache['fingerprint'] and not self._expired(cache['computed_at']):
+            return json.loads(cache['payload'])
+        else:
+            payload = self.compute_dashboard_summary(sims, seed)
+            self.repository.upsert_cache('dashboard', fp, payload)
+            return payload
 
-        projected_table = [
-            {
-                "position": int(projected.iat[i, 2]),
-                "team": projected.iat[i, 0],
-                "points": int(projected.iat[i, 1]),
-            }
-            for i in range(len(projected))
-        ]
+    def _expired(self, time_stored: str) -> bool:
 
-        current_table_points = [
-            {
-                "team": row["team"],
-                "points": int(row["points"]),
-            }
-            for index, row in current_table.iterrows()
-        ]
-        last_updated = now.strftime("%Y-%m-%d %H:%M:%S")
+        curr_time = datetime.now(timezone.utc)
+        elapsed_time = (curr_time - datetime.fromisoformat(time_stored)).total_seconds()
 
-        payload: DashboardSummary = {
-            "last_updated": last_updated,
-            "simulation_count": simulations,
-            "title_favorites": title_favs,
-            "top_4_race": top_4_race,
-            "projected_table": projected_table,
-            "current_table_points": current_table_points,
-            "upcoming_fixtures": upcoming_fixtures,
-            "match_of_the_week": upcoming_fixtures[0]
-        }
+        return elapsed_time > 1800
 
-        return payload
+
 
     def get_detailed_predictions(
         self,
@@ -135,8 +121,7 @@ class PredictionService:
 
         confidence_intervals = []
         for team in league_table["team"]:
-            dist = pred.get_team_points_distribution(all_points_distribution[team])
-
+            dist = get_team_points_distribution(all_points_distribution[team])
             confidence_intervals.append({
                 "team": team,
                 "median": round(dist["median"]),
@@ -154,31 +139,9 @@ class PredictionService:
             "confidence_intervals": confidence_intervals,
         }
 
-    def _upcoming_fixtures(self) -> list[dict[str, Any]]:
-        '''Helper function to retrieve upcoming fixtures from db'''
-        # remaining_matches = pred.get_remaining_matches(self.repository)
-        upcoming_fixture_df = pred.predict_all_remaining_matches(self.repository)
-        payload = []
-
-        for index, match in upcoming_fixture_df.iterrows():
-            entry = {
-                'date': match['date'],
-                'home_team': match['home_team'],
-                'away_team': match['away_team'],
-                'home_win_prob': match['home_win_prob'],
-                'draw_prob': match['draw_prob'],
-                'away_win_prob': match['away_win_prob'],
-                'expected_home_goals': match['expected_home_goals'],
-                'expected_away_goals': match['expected_away_goals']
-            }
-            payload.append(entry)
-
-        return payload[:4] # only need the top 4 upcoming fixtures
-
     def get_upcoming_fixtures(self) -> list[dict[str, Any]]:
         """Build payload for upcoming fixture page (with predictions)."""
-        # remaining_matches = pred.get_remaining_matches(self.repository)
-        upcoming_fixture_df = pred.predict_all_remaining_matches(self.repository)
+        upcoming_fixture_df = predict_all_remaining_matches(self.repository)
         payload = []
 
         for index, match in upcoming_fixture_df.iterrows():
@@ -207,8 +170,8 @@ class PredictionService:
         for scenario in overrides:
             validate_fixture_override(scenario, set(league_table["team"]))
 
-        team_probabilities = pred.get_team_probabilities(self.repository, simulations)
-        scenario_probabilities = pred.simulate_scenario(self.repository, overrides, simulations, seed)
+        team_probabilities = get_team_probabilities(self.repository, simulations)
+        scenario_probabilities = simulate_scenario(self.repository, overrides, simulations, seed)
 
         baseline = {
             "title": {
@@ -305,3 +268,100 @@ class PredictionService:
             "team_error_profile": team_error_profile,
             "freshness": freshness
         }
+    
+    def compute_dashboard_summary(
+        self,
+        simulations: int,
+        seed: int | None = None,
+    ) -> DashboardSummary:
+        """Build the full dashboard payload for `/` and `/api/dashboard`."""
+        now = datetime.now()
+        sims = simulate_season(self.repository, simulations, seed)
+        projected = get_project_final_points(self.repository)
+
+        pool = get_featured_fixture_pool(self.repository)
+        league_table = self.repository.get_current_table()
+
+        critical_match, critical_games = analyze_pool_swings(
+            self.repository,
+            pool,
+            sims,
+            simulations,
+            seed,
+        )
+        featured_matches: FeaturedMatches = {
+            "big_match": pick_big_match(pool, league_table),
+            "derby": pick_derby_from_pool(pool),
+            "critical_match": critical_match,
+        }
+
+        title_probabilities = sims["title_probabilities"]
+        top_4_probs = sims["top_4_probabilities"]
+        releg_probs = sims["relegation_probabilities"]
+        top3_teams = sorted(title_probabilities, key=title_probabilities.get, reverse=True)[:3]
+        top4_teams = sorted(top_4_probs, key=top_4_probs.get, reverse=True)[:4]
+        releg_teams = sorted(releg_probs, key=releg_probs.get, reverse=True)[:3]
+
+        title_favs: list[TeamProbabilityRow] = [
+            {
+                "team": team,
+                "title_probability": title_probabilities[team],
+                "top_4_probability": top_4_probs[team],
+            }
+            for team in top3_teams
+        ]
+        top_4_race: list[TeamProbabilityRow] = [
+            {
+                "team": team,
+                "title_probability": title_probabilities[team],
+                "top_4_probability": top_4_probs[team],
+            }
+            for team in top4_teams
+        ]
+        relegation_race: list[TeamProbabilityRow] = [
+            {
+                "team": team,
+                "title_probability": title_probabilities[team],
+                "top_4_probability": top_4_probs[team],
+                "relegation_probability": releg_probs[team],
+            }
+            for team in releg_teams
+        ]
+
+        meta: DashboardMeta = {
+            "matchweek": self.repository.get_matchweek(),
+            "season": 2025,
+            "season_label": "2025/26",
+        }
+
+        hero_match = build_hero_match(
+            self.repository,
+            featured_matches,
+            sims,
+            simulations,
+            seed,
+        )
+
+        payload: DashboardSummary = {
+            "last_updated": now.strftime("%Y-%m-%d %H:%M:%S"),
+            "simulation_count": simulations,
+            "meta": meta,
+            "title_favorites": title_favs,
+            "top_4_race": top_4_race,
+            "relegation_race": relegation_race,
+            "projected_table": build_rich_projected_table(
+                self.repository,
+                sims,
+                projected,
+                top_n=20,
+                bottom_n=0,
+            ),
+            "upcoming_fixtures": annotate_upcoming_fixtures(pool, limit=6),
+            "featured_matches": featured_matches,
+            "featured_spotlights": build_featured_spotlights(featured_matches, hero_match),
+            "critical_games": critical_games,
+            "hero_match": hero_match,
+            "form_pulse": get_form_pulse(self.repository),
+        }
+        return payload
+

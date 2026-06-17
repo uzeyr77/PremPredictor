@@ -32,14 +32,17 @@ def create_app() -> Flask:
     root = os.path.dirname(os.path.abspath(__file__))
     app = Flask(__name__, template_folder=os.path.join(root, "templates"))
     app.config["APP_CONFIG"] = config
+    app.config['DB_PATH'] = config.db_path
 
     # init PredictionRepository and PredictionService objects for usage
     # to use the service layer methods/functions from app.config["Prediction_SERVICE"]
     repository = PredictionRepository(db_path=config.db_path)
-    service = PredictionService(repository=repository)
+    service = PredictionService(repository=repository, config = config)
     app.config["PREDICTION_SERVICE"] = service
 
 
+    # setup cache
+    repository.ensure_cache_schema()
 
     # register blueprints
     app.register_blueprint(dashboard_bp)

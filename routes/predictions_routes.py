@@ -2,7 +2,6 @@
 
 from flask import Blueprint, current_app, jsonify, render_template, request
 
-from routes.query_params import _seed_from_request, _simulations_from_request
 
 # Blueprint object for all /predictions and /api/predictions endpoints.
 predictions_bp = Blueprint("predictions", __name__)
@@ -13,10 +12,8 @@ def _build_detailed_predictions():
     Shared payload builder for predictions page + predictions API.
     """
     cfg = current_app.config["APP_CONFIG"]
-    simulations = _simulations_from_request(cfg.default_simulations)
-    seed = _seed_from_request(cfg.default_seed)
     service = current_app.config["PREDICTION_SERVICE"]
-    return service.get_detailed_predictions(simulations, seed)
+    return service.get_detailed_predictions(cfg.defualt_simulations, cfg.defualt_seed)
 
 
 def _build_scenario_payload():

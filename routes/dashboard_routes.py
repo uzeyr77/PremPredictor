@@ -21,9 +21,6 @@ from __future__ import annotations
 # jsonify: turns a Python dict into an HTTP response with Content-Type: application/json.
 # render_template: runs Jinja2 on an HTML file under templates/, returns HTML text.
 from flask import Blueprint, current_app, jsonify, render_template
-
-from routes.query_params import _seed_from_request, _simulations_from_request
-
 # ---------------------------------------------------------------------------
 # Blueprint instance
 # ---------------------------------------------------------------------------
@@ -60,22 +57,8 @@ def _build_dashboard_summary():
     # "PREDICTION_SERVICE" holds the single PredictionService instance (DI pattern).
     service = current_app.config["PREDICTION_SERVICE"]
 
-    # "APP_CONFIG" is your dataclass from config.load_config(): defaults, db path, etc.
-    cfg = current_app.config["APP_CONFIG"]
-
-    # Read ?simulations= and ?seed= or fall back to cfg.default_simulations / cfg.default_seed.
-    # Helpers live in query_params.py; they may call abort(400) if the client sends garbage.
-    simulations = _simulations_from_request(cfg.default_simulations)
-    seed = _seed_from_request(cfg.default_seed)
-
-    # The browser waits until this returns — large ``simulations`` means a long request.
-    current_app.logger.info(
-        "Dashboard: starting Monte Carlo (%s simulations). First load can take a while.",
-        simulations,
-    )
-
     # One service call — all Monte Carlo / table logic stays out of this file.
-    return service.get_dashboard_summary(simulations, seed)
+    return service.get_dashboard_summary()
 
 
 @dashboard_bp.get("/")
@@ -89,9 +72,8 @@ def dashboard_page():
     # Same payload dict the API returns as JSON — keys match models.contracts.DashboardSummary.
     payload = _build_dashboard_summary()
 
-    # ``**payload`` unpacks the dict into keyword arguments for the template:
-    #   last_updated, simulation_count, title_favorites, top_4_race, projected_table
-    # So in index.html you can write {{ last_updated }}, {% for row in projected_table %}, etc.
+    # ``**payload`` unpacks the dict into keyword arguments for the template.
+    # Keys match models.contracts.DashboardSummary (meta, hero_match, form_pulse, etc.).
     return render_template("index.html", **payload)
 
 
