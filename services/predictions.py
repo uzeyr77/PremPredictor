@@ -874,7 +874,7 @@ def build_predicted_points_table_from_snapshot(season_simulation_past_season: di
 
 def build_table_backtest(repo: PredictionRepository, match_data: DataFrame):
         '''
-
+        Returns real results not a prediction
         Args:
             repo: PredictionRepository used to fetch 2024 team statistics
             match_data: match_data from previous season up to some matchweek n containing date, hom team, away team, result etc.
@@ -882,6 +882,7 @@ def build_table_backtest(repo: PredictionRepository, match_data: DataFrame):
 
         Returns: snapshot of the league table based on those results from matchweek 0 to n
         '''
+        print("heres the match data:", match_data)
         # win, loss, or draw and points, goals Scored, goals Conceded
         team_stats_2024 = repo.get_team_stats_2024()
         teams = team_stats_2024["team"]
@@ -1102,6 +1103,7 @@ def get_accuracy_trend(repo: PredictionRepository, season: str, checkpoints: lis
 
 
 def get_team_error_profile(repo: PredictionRepository, season: str, at_gameweek: int) -> list[dict]:
+
     '''
     compares predicted vs actual points of each team
     returns the per team error rows
@@ -1127,7 +1129,7 @@ def get_team_error_profile(repo: PredictionRepository, season: str, at_gameweek:
     '''
     # load current season data from database and aggregate by matches so far and matches remaining
     all_match_data = repo.get_match_data()
-    df_season_data = all_match_data[all_match_data["season"] == season]
+    df_season_data = all_match_data[all_match_data["season"] == int(season)]
     matches_so_far = df_season_data[df_season_data["matchweek"] <= at_gameweek]
     matches_remaining = df_season_data[df_season_data["matchweek"] > at_gameweek]
 
@@ -1137,7 +1139,7 @@ def get_team_error_profile(repo: PredictionRepository, season: str, at_gameweek:
     league_table_2024_true = repo.get_league_table_2024()
     snapshot_of_table = build_table_backtest(repo, matches_so_far)
     season_simulation_2024 = simulate_season_from_snapshot(repo, snapshot_of_table, matches_remaining, team_stats_2024,
-                                                           10_000)  # returns the dict with title, top4, and releg. probabilites
+                                                           10)  # returns the dict with title, top4, and releg. probabilites
     league_points_predicted_2024 = build_predicted_points_table_from_snapshot(season_simulation_2024, snapshot_of_table)
     league_points_true_2024 = league_table_2024_true[["team", "points"]].set_index('team')
 
@@ -1154,7 +1156,7 @@ def get_team_error_profile(repo: PredictionRepository, season: str, at_gameweek:
             "season": season,
             "gameweek": at_gameweek,
             "team": team,
-            "predicted_points": int(league_points_predicted_2024.loc[team,"points"]),
+            "predicted_points": int(league_points_predicted_2024.loc[team, "points"]),
             "actual_points": league_points_true_2024.loc[team, "points"],
             "points_error": abs(int(league_points_predicted_2024.loc[team,"points"]) - int(league_points_true_2024.loc[team, "points"])),
             "predicted_position": int(pred_rank[team]),

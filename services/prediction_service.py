@@ -250,7 +250,7 @@ class PredictionService:
             "comparison": comparison,
         }
 
-    def get_accuracy_tracking(self, season: str, at_gameweek: int, checkpoints: list[int]) -> dict[str, Any]:
+    def get_accuracy_tracking(self, season: int, at_gameweek: int, checkpoints: list[int]) -> dict[str, Any]:
         """Build payload for /accuracy page."""
         freshness = get_data_freshness_metadata()
         latest = backtest_model(self.repository, season, at_gameweek)
