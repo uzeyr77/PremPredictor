@@ -403,7 +403,6 @@
       <p class="breadcrumb-trail">DASHBOARD › GW{{ meta.matchweek if meta else '—' }}</p>
       <h1>Season <strong>{{ meta.season_label if meta else '2025/26' }}</strong></h1>
       <p>
-        <span class="dot"></span>
         {{ "{:,}".format(simulation_count) if simulation_count else '—' }} Monte Carlo simulations
       </p>
     </div>

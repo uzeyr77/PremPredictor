@@ -1329,6 +1329,8 @@ def pick_big_match(fixtures: list, current_table: DataFrame, top_n=6) -> dict | 
     if not top_clashes:
         return None
 
+    # best fixture is the teams in top 6 where the sum of their position in league is lower
+    # (e.i 1st and 2nd place clash is more interesting then 5th and 6th)
     best_fixture = min(
         top_clashes,
         key=lambda f: positions[f["home_team"]] + positions[f["away_team"]],

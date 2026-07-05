@@ -1,27 +1,17 @@
-"""
-Repository layer for all DB access.
-
-Routes should NEVER query SQLite directly from blueprint handlers — use this layer or services.
-"""
-
 import json
-import sqlite3
 import pandas as pd
 from contextlib import contextmanager
-from typing import Iterator
 from datetime import datetime, timezone
 
-
-from models.contracts import  DashboardSummary
-
+from database import get_db_connection
+from models.contracts import DashboardSummary
 
 class PredictionRepository:
-    def __init__(self, db_path: str) -> None:
-        self.db_path = db_path
+    pass
 
     @contextmanager
-    def _connect(self) -> Iterator[sqlite3.Connection]:
-        conn = sqlite3.connect(self.db_path)
+    def _connect(self):
+        conn = get_db_connection()
         try:
             yield conn
         finally:
@@ -30,13 +20,17 @@ class PredictionRepository:
     def assert_required_tables(self) -> None:
         required = {"league_table_2025", "match_data", "prem_teams_2025", "league_table_2024_final", "prem_teams_2024"}
         with self._connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type= 'table';")
-            existing_tables = {row[0] for row in cursor.fetchall()}
+            with conn.cursor() as cursor:
+                cursor.execute(
+                """
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'; """)
+                existing_tables = {row[0] for row in cursor.fetchall()}
 
-            missing = required - existing_tables
-            if missing:
-                raise ValueError(f"Missing required tables: {sorted(missing)}")
+                missing = required - existing_tables
+                if missing:
+                    raise ValueError(f"Missing required tables: {sorted(missing)}")
 
     def get_current_table(self) -> pd.DataFrame:
         with self._connect() as conn:
@@ -74,20 +68,21 @@ class PredictionRepository:
     
     def ensure_cache_schema(self) -> None:
         with self._connect() as conn:
-            conn.execute("""
-                 CREATE TABLE IF NOT EXISTS cache_computed (
-                     cache_key TEXT PRIMARY KEY,
-                     fingerprint TEXT NOT NULL,
-                     payload TEXT NOT NULL,
-                     computed_at TEXT NOT NULL,
-                     ttl_seconds INTEGER NOT NULL
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS dashboard_cache (
+                        cache_key TEXT PRIMARY KEY,
+                        fingerprint TEXT NOT NULL,
+                        payload TEXT NOT NULL,
+                        computed_at TEXT NOT NULL,
+                        ttl_seconds INTEGER NOT NULL
 
-                 )              
+                    )              
     """)
             conn.commit()
     
+    
     def db_fingerprint(self) -> str:
-        
         current_points_sum = self.get_current_table()['points'].sum()
         current_games_played = self.get_match_data()
         current_games_played = len(current_games_played[(current_games_played['season'] == 2025) & (current_games_played['played'] == 1)])
@@ -97,33 +92,51 @@ class PredictionRepository:
     def upsert_cache(self, cache_key: str, fingerprint:str, payload:DashboardSummary, ttl_seconds = 1800):
         now = datetime.now(timezone.utc).isoformat()
         with self._connect() as conn:
-            conn.execute("""INSERT into cache_computed (cache_key, fingerprint, payload, computed_at, ttl_seconds)
-            Values (?, ?, ?, ?, ?)
-            ON CONFLICT(cache_key) DO UPDATE SET
-                fingerprint = excluded.fingerprint,
-                payload = excluded.payload,
-                computed_at = excluded.computed_at,
-                ttl_seconds = excluded.ttl_seconds
-            """,
-            (cache_key, fingerprint, json.dumps(payload), now , ttl_seconds),
-        )
-            conn.commit()
+            with conn.cursor() as cursor:
+                cursor.execute("""INSERT into dashboard_cache (cache_key, fingerprint, payload, computed_at, ttl_seconds)
+                Values (%s, %s, %s, %s, %s)
+                ON CONFLICT(cache_key) DO UPDATE SET
+                    fingerprint = excluded.fingerprint,
+                    payload = excluded.payload,
+                    computed_at = excluded.computed_at,
+                    ttl_seconds = excluded.ttl_seconds
+                """,
+                (cache_key, fingerprint, json.dumps(payload), now , ttl_seconds),
+            )
+                conn.commit()
 
     def get_cached_payload(self, cache_key:str) -> dict | None:
         if not cache_key:
             raise ValueError("the cache_key cannot be empty")
-        query = "SELECT fingerprint, payload, computed_at, ttl_seconds FROM cache_computed WHERE cache_key = ?"
+        query = """
+                SELECT fingerprint, payload, computed_at, ttl_seconds 
+                FROM dashboard_cache 
+                WHERE cache_key = %s
+                """
         with self._connect() as conn:
-            row = conn.execute(query, (cache_key,)).fetchone()
+            with conn.cursor() as cursor:
+                cursor.execute(query, (cache_key,))
+                row = cursor.fetchone()
 
-            if row is None:
-                return None
-            else:
-                return {
-                    'fingerprint': row[0],
-                    'payload': row[1],
-                    'computed_at': row[2],
-                    'ttl_seconds': row[3]
-                }
+                if row is None:
+                    return None
+                else:
+                    return {
+                        'fingerprint': row[0],
+                        'payload': row[1],
+                        'computed_at': row[2],
+                        'ttl_seconds': row[3]
+                    }
+    def quick_check(self):
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT current_database(), inet_server_addr();")
+                print(cur.fetchone())
 
+                cur.execute("""
+                    SELECT table_schema, table_name
+                    FROM information_schema.tables
+                    WHERE table_name = 'league_table_2025';
+                """)
+                print(cur.fetchall())
 
