@@ -6,6 +6,9 @@ from scipy.stats import poisson
 from sklearn.metrics import mean_absolute_error
 
 from services.repository import PredictionRepository  # for annotations
+from config import load_config
+
+_CURRENT_SEASON = load_config().current_season
 
 # constants for predictions
 HOME_ADVANTAGE = 1.3
@@ -30,9 +33,16 @@ RACE_LABELS = {
     "relegation": "Relegation Race",
 }
 
+
+def _fetch_team_stats(repo: PredictionRepository):
+# helper function to reduce the calls to .get_team_statistics() becauase it gets called 
+# in predict_match(repo, ...) and it gets called x number of times where x is the remaining matches
+# instead call once in this function and pass to all the use casses
+    return repo.get_team_statistics()
+
 def get_remaining_matches(repo: PredictionRepository) -> pd.DataFrame:
    match_data = repo.get_match_data()
-   remaining_matches = match_data[match_data.played == 0]
+   remaining_matches = match_data[(match_data.season.astype(int) == _CURRENT_SEASON) & (match_data.played == 0)]
    return remaining_matches
 
 
@@ -174,7 +184,7 @@ def get_project_final_points(repo: PredictionRepository) -> DataFrame:
     return resu
 
 
-def predict_match(repo: PredictionRepository, home_team: str, away_team: str):
+def predict_match(repo: PredictionRepository, home_team: str, away_team: str, team_statistics: DataFrame):
     #  expected goals are the lambda values for each team
     #  poisson.pmf(k, Lambda) k represents the number of events (goals) and lambda is expected
     #  poisson.pmf(2, 1.6) is the probability of scoring EXACTLY 2 goals when the expected is 1.6
@@ -197,7 +207,6 @@ def predict_match(repo: PredictionRepository, home_team: str, away_team: str):
     for each match
 
     '''
-    team_statistics = repo.get_team_statistics()
     home_attack =  team_statistics.loc[team_statistics['team'] == home_team, 'attack_strength'].values[0]
     home_defense = team_statistics.loc[team_statistics['team'] == home_team, 'defense_strength'].values[0]
     away_attack =  team_statistics.loc[team_statistics['team'] == away_team, 'attack_strength'].values[0]
@@ -244,14 +253,15 @@ def predict_all_remaining_matches(repo: PredictionRepository):
         - expected_home_goals
         - expected_away_goals
     """
+    stats = repo.get_team_statistics()
     match_data = repo.get_match_data()
-    remaining_matches = match_data[match_data['played'] == 0]
+    remaining_matches = match_data[(match_data['season'].astype(int) == _CURRENT_SEASON) & (match_data['played'] == 0)]
     predicted_rows = []
     for index in remaining_matches.index: # loop through indices
         match = remaining_matches.loc[index] # match is the ith row in the column
         home_t = match['home_team']
         away_t = match['away_team']
-        match_prediction = predict_match(repo, home_t, away_t)
+        match_prediction = predict_match(repo, home_t, away_t, team_statistics = stats)
         home_win_prob = match_prediction['home_win_prob']
         draw_prob = match_prediction['draw_prob']
         away_win_prob = match_prediction['away_win_prob']
@@ -1183,7 +1193,7 @@ def get_data_freshness_metadata() -> dict:
 def get_recent_form(repo: PredictionRepository, n: int = 5) -> pd.Series:
     """Last n W/D/L results per team from played matches in the current season."""
     played = repo.get_match_data()
-    played = played[(played["season"] == 2025) & (played["played"] == 1)]
+    played = played[(played["season"].astype(int) == _CURRENT_SEASON) & (played["played"] == 1)]
     played = played.sort_values(["matchweek", "date"])
     rows = []
     for _, m in played.iterrows():
@@ -1245,7 +1255,7 @@ def get_head_to_head(
 ) -> list[str]:
     """Last n meetings from one team's perspective (W/D/L)."""
     played = repo.get_match_data()
-    played = played[(played["season"] == 2025) & (played["played"] == 1)]
+    played = played[(played["season"].astype(int) == _CURRENT_SEASON) & (played["played"] == 1)]
     mask = (
         ((played["home_team"] == home_team) & (played["away_team"] == away_team))
         | ((played["home_team"] == away_team) & (played["away_team"] == home_team))
@@ -1266,8 +1276,9 @@ def get_head_to_head(
     return results
 
 def get_featured_fixture_pool(repo: PredictionRepository) -> list[dict]:
+    stats = repo.get_team_statistics()
     remaining_matches = get_remaining_matches(repo)
-    remaining_matches = remaining_matches[remaining_matches['season'] == 2025]
+    remaining_matches = remaining_matches[remaining_matches['season'].astype(int) == _CURRENT_SEASON]
     curr_mw = repo.get_matchweek()
 
     current_week = remaining_matches[remaining_matches['matchweek'] == curr_mw]
@@ -1284,7 +1295,7 @@ def get_featured_fixture_pool(repo: PredictionRepository) -> list[dict]:
     # predictions
     results = []
     for _, row in pool.iterrows():
-        probs = predict_match(repo, row['home_team'], row['away_team'])
+        probs = predict_match(repo, row['home_team'], row['away_team'], team_statistics = stats)
         results.append(
             { "matchweek": int(row['matchweek']),
               'date': row['date'],

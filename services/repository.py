@@ -4,7 +4,10 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from database import get_db_connection
+from config import load_config
 from models.contracts import DashboardSummary
+
+_CURRENT_SEASON = load_config().current_season
 
 class PredictionRepository:
     pass
@@ -18,7 +21,7 @@ class PredictionRepository:
             conn.close()
 
     def assert_required_tables(self) -> None:
-        required = {"league_table_2025", "match_data", "prem_teams_2025", "league_table_2024_final", "prem_teams_2024"}
+        required = {"league_table_2026", "match_data", "prem_teams_2026", "league_table_2024_final", "prem_teams_2024"}
         with self._connect() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
@@ -34,11 +37,11 @@ class PredictionRepository:
 
     def get_current_table(self) -> pd.DataFrame:
         with self._connect() as conn:
-            return pd.read_sql_query("SELECT * FROM league_table_2025", conn)
+            return pd.read_sql_query("SELECT * FROM league_table_2026", conn)
 
     def get_team_statistics(self) -> pd.DataFrame:
         with self._connect() as conn:
-            team_stats = pd.read_sql_query("SELECT * FROM prem_teams_2025", conn)
+            team_stats = pd.read_sql_query("SELECT * FROM prem_teams_2026", conn)
             return team_stats.drop(columns=["goals_scored", "goals_conceded"])
 
     def get_match_data(self) -> pd.DataFrame:
@@ -55,7 +58,7 @@ class PredictionRepository:
 
     def get_matchweek(self) -> int:
         played = self.get_match_data()
-        played = played[played['season'] == 2025]
+        played = played[played['season'].astype(int) == _CURRENT_SEASON]
         played = played[played['played'] == 1]
         if played.empty:
             return 1
@@ -85,7 +88,7 @@ class PredictionRepository:
     def db_fingerprint(self) -> str:
         current_points_sum = self.get_current_table()['points'].sum()
         current_games_played = self.get_match_data()
-        current_games_played = len(current_games_played[(current_games_played['season'] == 2025) & (current_games_played['played'] == 1)])
+        current_games_played = len(current_games_played[(current_games_played['season'].astype(int) == _CURRENT_SEASON) & (current_games_played['played'] == 1)])
         
         return f"{current_games_played}:{current_points_sum}"
     
@@ -136,7 +139,7 @@ class PredictionRepository:
                 cur.execute("""
                     SELECT table_schema, table_name
                     FROM information_schema.tables
-                    WHERE table_name = 'league_table_2025';
+                    WHERE table_name = 'league_table_2026';
                 """)
                 print(cur.fetchall())
 

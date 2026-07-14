@@ -330,8 +330,8 @@ class PredictionService:
 
         meta: DashboardMeta = {
             "matchweek": self.repository.get_matchweek(),
-            "season": 2025,
-            "season_label": "2025/26",
+            "season": self.config.current_season,
+            "season_label": self.config.current_season_label,
         }
 
         hero_match = build_hero_match(
