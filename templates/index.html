@@ -373,7 +373,7 @@
 ════════════════════════════════ #}
 <aside class="site-sidebar">
   <a href="{{ url_for('dashboard.dashboard_page') }}" class="brand">
-    PremPredictor <em>{{ meta.season_label if meta else '2025/26' }}</em>
+    PremPredictor <em>{{ meta.season_label if meta else '2026/27' }}</em>
   </a>
 
   <nav class="site-nav">
@@ -401,7 +401,7 @@
   <div class="dash-header">
     <div class="dash-greeting">
       <p class="breadcrumb-trail">DASHBOARD › GW{{ meta.matchweek if meta else '—' }}</p>
-      <h1>Season <strong>{{ meta.season_label if meta else '2025/26' }}</strong></h1>
+      <h1>Season <strong>{{ meta.season_label if meta else '2026/27' }}</strong></h1>
       <p>
         {{ "{:,}".format(simulation_count) if simulation_count else '—' }} Monte Carlo simulations
       </p>

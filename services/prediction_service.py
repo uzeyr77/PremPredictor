@@ -54,20 +54,26 @@ class PredictionService:
     def get_dashboard_summary(
         self,
     ) -> DashboardSummary:
-        """Build the full dashboard payload for `/` and `/api/dashboard`."""
+        """
+        Serve dashboard payload for `/` and `/api/dashboard`.
+
+        Stale-while-revalidate:
+        - If any cache row exists, return it immediately (even if expired).
+        - Background/scheduled refresh_cache.py owns recomputation.
+        - Only compute synchronously on true cold start (no cache row yet).
+        """
         fp = self.repository.db_fingerprint()
         cache = self.repository.get_cached_payload('dashboard')
-        sims = self.config.default_simulations
-        seed = self.config.default_seed
-        # if the cache is found in the table, and it matches the current fingerprint, and it is not expired
-        # then it is a cache hit and there is no compute required
 
-        if cache and fp == cache['fingerprint'] and not self._expired(cache['computed_at']):
+        if cache:
             return json.loads(cache['payload'])
-        else:
-            payload = self.compute_dashboard_summary(sims, seed)
-            self.repository.upsert_cache('dashboard', fp, payload)
-            return payload
+
+        payload = self.compute_dashboard_summary(
+            self.config.default_simulations,
+            self.config.default_seed,
+        )
+        self.repository.upsert_cache('dashboard', fp, payload)
+        return payload
 
     def _expired(self, time_stored: str) -> bool:
 
@@ -276,10 +282,20 @@ class PredictionService:
     ) -> DashboardSummary:
         """Build the full dashboard payload for `/` and `/api/dashboard`."""
         now = datetime.now()
-        sims = simulate_season(self.repository, simulations, seed)
+        # Predict remaining fixtures once; reuse for baseline + swing/stakes scenarios.
+        predicted_fixtures = predict_all_remaining_matches(self.repository)
+        sims = simulate_season(
+            self.repository,
+            simulations,
+            seed,
+            remaining_fixtures=predicted_fixtures,
+        )
         projected = get_project_final_points(self.repository)
 
-        pool = get_featured_fixture_pool(self.repository)
+        pool = get_featured_fixture_pool(
+            self.repository,
+            predicted_fixtures=predicted_fixtures,
+        )
         league_table = self.repository.get_current_table()
 
         critical_match, critical_games = analyze_pool_swings(
@@ -288,6 +304,7 @@ class PredictionService:
             sims,
             simulations,
             seed,
+            predicted_fixtures=predicted_fixtures,
         )
         featured_matches: FeaturedMatches = {
             "big_match": pick_big_match(pool, league_table),
@@ -340,6 +357,7 @@ class PredictionService:
             sims,
             simulations,
             seed,
+            predicted_fixtures=predicted_fixtures,
         )
 
         payload: DashboardSummary = {

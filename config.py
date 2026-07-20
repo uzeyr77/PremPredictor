@@ -9,6 +9,8 @@ Environment variables:
                           Override simulation count for dashboard / APIs.
                           If unset: 2000 in development (snappier UI), 10000 in production.
   PLP_DEFAULT_SEED      Optional int for reproducibility hooks
+  PLP_CURRENT_SEASON    Active season year for predictions (default: 2026)
+  PLP_CURRENT_SEASON_LABEL  Display label e.g. 2026/27 (default: 2026/27)
 """
 
 from dataclasses import dataclass
@@ -28,6 +30,9 @@ class AppConfig:
     default_gameweek_backtest: int
     default_season_backtest: str
     default_checkpoints: list[int]
+    current_season: int
+    current_season_label: str
+
 def load_config() -> AppConfig:
     flask_env = os.getenv("FLASK_ENV", "development")
     flask_debug = os.getenv("FLASK_DEBUG", "1") == "1"
@@ -42,6 +47,8 @@ def load_config() -> AppConfig:
         default_simulations = 10
     raw_seed = os.getenv("PLP_DEFAULT_SEED")
     default_seed = int(raw_seed) if raw_seed is not None else None
+    current_season = int(os.getenv("PLP_CURRENT_SEASON", "2026"))
+    current_season_label = os.getenv("PLP_CURRENT_SEASON_LABEL", "2026/27")
 
     return AppConfig(
         flask_env=flask_env,
@@ -51,5 +58,7 @@ def load_config() -> AppConfig:
         default_seed=default_seed,
         default_gameweek_backtest=17, # right in the middle of the season
         default_season_backtest="2024", # season to backtest on
-        default_checkpoints = [5,10,15,20,25]
+        default_checkpoints = [5,10,15,20,25,35],
+        current_season=current_season,
+        current_season_label=current_season_label,
     )

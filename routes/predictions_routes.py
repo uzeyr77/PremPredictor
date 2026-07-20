@@ -62,7 +62,7 @@ def _build_scenario_payload():
             return jsonify({"error": "'simulations' must be an integer >= 1."}), 400
         simulations = raw_simulations
     else:
-        simulations = _simulations_from_request(cfg.default_simulations)
+        simulations = _simulations_from_request(cdefault_simulations)
 
     # seed: prefer JSON body value; otherwise query helper/default.
     if "seed" in body:
