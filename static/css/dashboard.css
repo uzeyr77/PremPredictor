@@ -1,4 +1,5 @@
-/* PremPredictor Dashboard — Design System v4 */
+/* Hallmark · genre: modern-minimal · macrostructure: Workbench · design-system: design.md · designed-as-app */
+/* PremPredictor Dashboard — Technical sports analytics interface */
 /* OKLCH color space for perceptual uniformity */
 
 :root {
@@ -9,10 +10,10 @@
 
   /* Fixed rem scale (1.25 ratio) — dashboard UI, not marketing */
   /* 5-step scale with clear hierarchy: xs, sm, base, lg, xl, 2xl, 3xl */
-  --text-xs:   0.6875rem;   /* 11px — labels, captions */
-  --text-sm:   0.8125rem;   /* 13px — secondary text */
-  --text-base: 0.875rem;    /* 14px — body text */
-  --text-lg:   1.0625rem;   /* 17px — subheadings */
+  --text-xs:   0.75rem;     /* 12px — labels, captions */
+  --text-sm:   0.875rem;    /* 14px — secondary text */
+  --text-base: 1rem;        /* 16px — body text */
+  --text-lg:   1.125rem;    /* 18px — subheadings */
   --text-xl:   1.375rem;    /* 22px — section headers */
   --text-2xl:  1.75rem;     /* 28px — page titles */
   --text-3xl:  2.375rem;    /* 38px — hero numbers */
@@ -23,7 +24,7 @@
   --leading-relaxed: 1.65;
 
   /* Letter spacing — tighten display, open labels */
-  --tracking-tight:  -0.02em;
+  --tracking-tight:  -0.03em;  /* refined from -0.02em for sharper data headers */
   --tracking-normal: 0;
   --tracking-wide:   0.06em;
 
@@ -50,9 +51,11 @@
   --text-disabled:  oklch(32% 0.005 280);
 
   /* ── Accent ── */
-  --accent:         oklch(75% 0.010 280);
-  --accent-hover:   oklch(85% 0.012 280);
-  --accent-soft:    oklch(75% 0.010 280 / 0.12);
+  /* Refined: increased chroma from 0.010 to 0.16 for better visibility */
+  --accent:         oklch(75% 0.16 280);
+  --accent-hover:   oklch(80% 0.18 280);
+  --accent-active:  oklch(70% 0.14 280);
+  --accent-soft:    oklch(75% 0.16 280 / 0.12);
 
   /* ── Semantic colors ── */
   --positive:       oklch(70% 0.18 145);
@@ -70,7 +73,7 @@
   --ucl:            oklch(65% 0.15 260);
   --ucl-bg:         oklch(65% 0.15 260 / 0.10);
 
-  /* ── Spacing ── */
+  /* ── Spacing (4pt scale) ── */
   --sp-1:  4px;
   --sp-2:  8px;
   --sp-3:  16px;
@@ -79,7 +82,16 @@
   --sp-6:  48px;
   --sp-7:  64px;
 
+  /* ── Radii ── */
   --radius: 8px;
+  --radius-sm: 6px;
+  --radius-pill: 999px;
+
+  /* ── Motion ── */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-short: 220ms;
+  --dur-base: 300ms;
+  --dur-long: 600ms;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -95,6 +107,15 @@ html, body {
   letter-spacing: var(--tracking-normal);
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'ss01' on, 'cv01' on; /* Geist stylistic alternates */
+  overflow-x: clip; /* prevent horizontal scroll */
+}
+
+html {
+  overflow-x: clip; /* mobile-responsiveness gate 34 */
+}
+
+body {
+  overflow-x: clip;
 }
 
 .mono {
@@ -148,7 +169,7 @@ html, body {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  animation: fadeUp 0.2s ease both;
+  animation: fadeUp var(--dur-base) var(--ease-out) both;
 }
 
 .dash-greeting h1 {
@@ -206,7 +227,9 @@ html, body {
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  transition: transform var(--dur-short) var(--ease-out),
+              box-shadow var(--dur-short) var(--ease-out),
+              border-color var(--dur-short) var(--ease-out);
   cursor: default;
   overflow: hidden;
 }
@@ -215,6 +238,11 @@ html, body {
   transform: translateY(-2px);
   box-shadow: 0 8px 32px rgba(0,0,0,0.35);
   border-color: var(--border-hover);
+}
+
+.feature-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Feature cards — subtle background tints (no top borders) */
@@ -313,7 +341,8 @@ html, body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--sp-3);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--dur-short) var(--ease-out),
+              box-shadow var(--dur-short) var(--ease-out);
 }
 
 .stat-card:hover {
@@ -369,7 +398,7 @@ html, body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
-  transition: border-color 0.15s;
+  transition: border-color var(--dur-short) var(--ease-out);
 }
 
 .panel:hover { background: var(--surface); }
@@ -412,9 +441,18 @@ html, body {
   color: var(--text-secondary);
   text-decoration: none;
   flex-shrink: 0;
+  transition: color var(--dur-short) var(--ease-out);
 }
 
-.panel-head a:hover { color: var(--text-primary); }
+.panel-head a:hover {
+  color: var(--text-primary);
+}
+
+.panel-head a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 
 /* ── Standings scroll wrapper ── */
 .standings-scroll {
@@ -494,7 +532,8 @@ html, body {
 .fixture-card {
   padding: var(--sp-3) var(--sp-4);
   border-bottom: 1px solid var(--border);
-  transition: background 0.12s, box-shadow 0.12s;
+  transition: background var(--dur-short) var(--ease-out),
+              box-shadow var(--dur-short) var(--ease-out);
 }
 
 .fixture-card:last-child { border-bottom: 0; }
@@ -546,6 +585,7 @@ html, body {
   text-overflow: ellipsis;
   color: var(--text-secondary);
   font-weight: var(--weight-medium);
+  overflow-wrap: anywhere; /* gate 51 */
 }
 
 .fixture-row--fav .team-name {
@@ -568,7 +608,7 @@ html, body {
 .prob-track {
   display: flex;
   height: 3px;
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   background: var(--surface-strong);
   margin-top: var(--sp-1);
@@ -608,14 +648,29 @@ html, body {
   flex: 1;
   padding: 6px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   cursor: pointer;
   font-family: var(--font);
-  transition: background 0.12s, color 0.12s;
+  transition: background var(--dur-short) var(--ease-out),
+              color var(--dur-short) var(--ease-out);
+}
+
+.form-tabs button:hover {
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+}
+
+.form-tabs button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.form-tabs button:active {
+  transform: translateY(1px);
 }
 
 .form-tabs button.active {
@@ -689,11 +744,13 @@ html, body {
 .critical-card {
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 12px;
   position: relative;
   overflow: hidden;
-  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  transition: transform var(--dur-short) var(--ease-out),
+              box-shadow var(--dur-short) var(--ease-out),
+              border-color var(--dur-short) var(--ease-out);
 }
 
 .critical-card:hover {
@@ -770,7 +827,7 @@ html, body {
   color: oklch(100% 0 0);
   font-weight: var(--weight-black);
   flex-shrink: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   position: relative;
   overflow: hidden;
 }
@@ -823,27 +880,51 @@ html, body {
   50%       { opacity: 0.35; transform: scale(0.6); }
 }
 
-.panel { animation: fadeUp 0.3s ease both; }
-.feature-card:nth-child(1) { animation: fadeUp 0.3s ease both 0.05s; }
-.feature-card:nth-child(2) { animation: fadeUp 0.3s ease both 0.10s; }
-.feature-card:nth-child(3) { animation: fadeUp 0.3s ease both 0.15s; }
-.feature-card:nth-child(4) { animation: fadeUp 0.3s ease both 0.20s; }
-.stat-card:nth-child(1) { animation: fadeUp 0.3s ease both 0.08s; }
-.stat-card:nth-child(2) { animation: fadeUp 0.3s ease both 0.12s; }
-.stat-card:nth-child(3) { animation: fadeUp 0.3s ease both 0.16s; }
-.stat-card:nth-child(4) { animation: fadeUp 0.3s ease both 0.20s; }
+.panel { animation: fadeUp var(--dur-base) var(--ease-out) both; }
+.feature-card:nth-child(1) { animation: fadeUp var(--dur-base) var(--ease-out) both 0.05s; }
+.feature-card:nth-child(2) { animation: fadeUp var(--dur-base) var(--ease-out) both 0.10s; }
+.feature-card:nth-child(3) { animation: fadeUp var(--dur-base) var(--ease-out) both 0.15s; }
+.feature-card:nth-child(4) { animation: fadeUp var(--dur-base) var(--ease-out) both 0.20s; }
+.stat-card:nth-child(1) { animation: fadeUp var(--dur-base) var(--ease-out) both 0.08s; }
+.stat-card:nth-child(2) { animation: fadeUp var(--dur-base) var(--ease-out) both 0.12s; }
+.stat-card:nth-child(3) { animation: fadeUp var(--dur-base) var(--ease-out) both 0.16s; }
+.stat-card:nth-child(4) { animation: fadeUp var(--dur-base) var(--ease-out) both 0.20s; }
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .panel,
+  .feature-card,
+  .stat-card {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
 
 /* ── Responsive ── */
 @media (max-width: 1279px) {
   .dash-body { grid-template-columns: 1fr; }
 }
 
-
 @media (max-width: 640px) {
   .dashboard { padding: var(--sp-3); }
   .feature-cards { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .critical-panel-body { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 414px) {
+  .critical-panel-body {
+    grid-template-columns: 1fr;
+  }
 }
 
 .race-bar-fill--releg { background: var(--negative); }

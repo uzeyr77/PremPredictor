@@ -283,7 +283,7 @@
         </div>
         <div class="fc-badge-pill">{{ hero_match.badge }}</div>
         <div class="fc-foot">
-          <span>{{ hero_match.date }}</span>
+          <span>{{ hero_match.date | friendly_date }}</span>
           <span>{{ (hero_match.home_win_prob * 100) | round(0) | int }}% home win</span>
         </div>
       {% else %}
@@ -302,7 +302,7 @@
           {% set gap = ((t.title_probability - title_favorites[1].title_probability) * 100) | round(1) %}
           <div class="fc-foot">
             <span>vs {{ title_favorites[1].team }}</span>
-            <span style="color:var(--warning)">+{{ gap }}pp</span>
+            <span style="color:var(--warning)">+{{ gap }}pts</span>
           </div>
         {% endif %}
       {% else %}
@@ -355,7 +355,7 @@
     <div class="panel-head">
       <div>
         <h2>Featured Match</h2>
-        <span class="hint">{{ hero_match.badge }} &middot; {{ hero_match.date }}</span>
+        <span class="hint">{{ hero_match.badge }} &middot; {{ hero_match.date | friendly_date }}</span>
       </div>
       <span style="font-size:11px; color:var(--text-muted); font-weight:600; letter-spacing:0.06em; text-transform:uppercase;">
         GW{{ hero_match.matchweek }}
@@ -445,12 +445,12 @@
     {% if hero_match.stakes %}
       <div class="hero-stakes">
         {% for stake in hero_match.stakes %}
-          {% set delta_pct = (stake.delta * 100) | round(1) %}
+          {% set delta_pct = stake.delta | round(1) %}
           <div class="stake-row">
             <div class="stake-race">{{ stake.race }}</div>
             <div class="stake-desc">{{ stake.description }}</div>
             <div class="stake-delta {% if delta_pct > 2 %}pos{% elif delta_pct < -2 %}neg{% else %}neu{% endif %}">
-              {% if delta_pct > 0 %}+{% endif %}{{ delta_pct }}pp · {{ stake.team }}
+              {% if delta_pct > 0 %}+{% endif %}{{ delta_pct }}pts · {{ stake.team }}
             </div>
           </div>
         {% endfor %}
@@ -573,7 +573,7 @@
             {% endif %}
             <div class="critical-card {{ race_cls }}">
               <div class="race-label">{{ game.race }}</div>
-              <div class="swing">±{{ (game.swing * 100) | round(1) }}pp</div>
+              <div class="swing">±{{ (game.swing * 100) | round(1) }}pts</div>
               <div class="matchup">
                 {{ game.home_team }}
                 <span class="vs">vs</span>
@@ -581,7 +581,7 @@
               </div>
               <div class="foot">
                 <span>{{ game.badge }}</span>
-                <span>{{ game.date }}</span>
+                <span>{{ game.date | friendly_date }}</span>
               </div>
             </div>
           {% endfor %}
@@ -659,7 +659,7 @@
           {% set fav_home = fx.home_win_prob >= fx.away_win_prob %}
           <div class="fixture-card">
             <div class="top">
-              <span class="date">{{ fx.date }}</span>
+              <span class="date">{{ fx.date | friendly_date }}</span>
               <span class="pick{% if fx.pick == 'Toss-up' %} tossup{% endif %}">{{ fx.pick }}</span>
             </div>
             <div class="fixture-row{% if fav_home %} fixture-row--fav{% endif %}">
