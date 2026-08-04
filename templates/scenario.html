@@ -1,9 +1,662 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenarios — PremPredictor</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/style.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-mono/style.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <style>
+    .page-shell {
+      min-height: 100vh;
+      padding: var(--sp-4);
+    }
 
-{% block title %}Home page{% endblock %}
+    .page-content {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
 
+    .page-header {
+      margin-bottom: var(--sp-4);
+    }
 
+    .page-title {
+      font-size: var(--text-2xl);
+      font-weight: var(--weight-bold);
+      color: var(--text-primary);
+      letter-spacing: var(--tracking-tight);
+      margin: 0;
+    }
 
-{% block content %}
-    <h1>Welcome to the scenario page</h1>
-{% endblock %}
+    .page-sub {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin: var(--sp-1) 0 0;
+    }
+
+    /* ── Main Layout ── */
+    .scenario-layout {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: var(--sp-4);
+      align-items: start;
+    }
+
+    /* ── Fixture List Panel ── */
+    .fixture-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .fixture-panel-head {
+      padding: var(--sp-3) var(--sp-4);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-raised);
+    }
+
+    .fixture-panel-head h2 {
+      margin: 0;
+      font-size: var(--text-xs);
+      font-weight: var(--weight-bold);
+      letter-spacing: var(--tracking-wide);
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+
+    .fixture-panel-head .hint {
+      font-size: var(--text-sm);
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .fixture-list {
+      max-height: calc(100vh - 280px);
+      overflow-y: auto;
+    }
+
+    .fixture-list::-webkit-scrollbar { width: 4px; }
+    .fixture-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Individual Fixture Item ── */
+    .fixture-item {
+      padding: var(--sp-3);
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+      cursor: pointer;
+    }
+
+    .fixture-item:last-child { border-bottom: 0; }
+    .fixture-item:hover { background: var(--surface-raised); }
+    .fixture-item.selected { background: var(--accent-soft); }
+
+    .fixture-date {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-bottom: var(--sp-2);
+    }
+
+    .fixture-matchup {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      margin-bottom: var(--sp-2);
+    }
+
+    .fixture-team {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      min-width: 0;
+    }
+
+    .fixture-team.home { justify-content: flex-start; }
+    .fixture-team.away { justify-content: flex-end; flex-direction: row-reverse; }
+
+    .team-badge {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-xs);
+      font-weight: var(--weight-black);
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .team-info {
+      min-width: 0;
+    }
+
+    .team-name {
+      font-size: var(--text-sm);
+      font-weight: var(--weight-semibold);
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .team-label {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-wide);
+    }
+
+    .fixture-vs {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      font-weight: var(--weight-medium);
+      padding: 0 var(--sp-1);
+    }
+
+    /* ── Outcome Selector (Segmented Control) ── */
+    .outcome-selector {
+      display: flex;
+      background: var(--bg);
+      border-radius: 6px;
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .outcome-btn {
+      flex: 1;
+      padding: 8px 4px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: var(--text-xs);
+      font-weight: var(--weight-semibold);
+      font-family: var(--font);
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+
+    .outcome-btn:hover {
+      color: var(--text-secondary);
+      background: var(--surface-raised);
+    }
+
+    .outcome-btn.active {
+      background: var(--accent);
+      color: var(--bg);
+      font-weight: var(--weight-bold);
+    }
+
+    .outcome-btn.active.home-win { background: var(--positive); }
+    .outcome-btn.active.draw { background: var(--neutral); }
+    .outcome-btn.active.away-win { background: var(--negative); }
+
+    /* ── Results Panel ── */
+    .results-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .results-head {
+      padding: var(--sp-3) var(--sp-4);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-raised);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .results-head h2 {
+      margin: 0;
+      font-size: var(--text-xs);
+      font-weight: var(--weight-bold);
+      letter-spacing: var(--tracking-wide);
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+
+    .scenario-badge {
+      display: none;
+      padding: var(--sp-1) var(--sp-2);
+      background: var(--accent-soft);
+      border-radius: 4px;
+      font-size: var(--text-xs);
+      font-weight: var(--weight-semibold);
+      color: var(--accent);
+    }
+
+    .scenario-badge.show { display: inline-flex; }
+
+    .results-scroll {
+      max-height: calc(100vh - 280px);
+      overflow-y: auto;
+    }
+
+    .results-scroll::-webkit-scrollbar { width: 4px; }
+    .results-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Results Table ── */
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--text-sm);
+    }
+
+    .results-table th {
+      text-align: left;
+      padding: 0 var(--sp-3);
+      height: 36px;
+      font-size: var(--text-xs);
+      font-weight: var(--weight-bold);
+      letter-spacing: var(--tracking-wide);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      background: var(--surface-raised);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+    }
+
+    .results-table th.r { text-align: right; }
+
+    .results-table td {
+      padding: 10px var(--sp-3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .results-table td.r { text-align: right; }
+    .results-table tr:last-child td { border-bottom: 0; }
+    .results-table tbody tr:hover td { background: var(--surface-raised); }
+
+    .results-table .team-cell {
+      font-weight: var(--weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .results-table .mono {
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .delta {
+      font-size: var(--text-xs);
+      font-weight: var(--weight-bold);
+      margin-left: 4px;
+    }
+
+    .delta.pos { color: var(--positive); }
+    .delta.neg { color: var(--negative); }
+    .delta.neu { color: var(--text-muted); }
+
+    .empty-state {
+      padding: var(--sp-6);
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: var(--sp-3);
+      opacity: 0.3;
+    }
+
+    .empty-state-text {
+      font-size: var(--text-sm);
+    }
+
+    .loading-state {
+      padding: var(--sp-5);
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .loading-spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto var(--sp-2);
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ── Pill Navigation ── */
+    .pill-nav {
+      display: flex;
+      justify-content: center;
+      padding: var(--sp-4) 0;
+    }
+
+    .pill-nav-inner {
+      display: inline-flex;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px;
+    }
+
+    .pill-nav-link {
+      padding: var(--sp-2) var(--sp-4);
+      border-radius: 999px;
+      font-size: var(--text-sm);
+      font-weight: var(--weight-semibold);
+      color: var(--text-secondary);
+      text-decoration: none;
+      min-width: 120px;
+      text-align: center;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .pill-nav-link:hover {
+      background: var(--surface-raised);
+      color: var(--text-primary);
+    }
+
+    .pill-nav-link.active {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .scenario-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .fixture-list,
+      .results-scroll {
+        max-height: 400px;
+      }
+    }
+
+    @media (max-width: 540px) {
+      .page-shell { padding: var(--sp-3); }
+
+      .fixture-matchup {
+        flex-direction: column;
+        gap: var(--sp-1);
+      }
+
+      .fixture-team.away {
+        flex-direction: row;
+        justify-content: flex-start;
+      }
+
+      .fixture-vs { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="pill-nav">
+  <div class="pill-nav-inner">
+    <a href="{{ url_for('dashboard.dashboard_page') }}" class="pill-nav-link">Dashboard</a>
+    <a href="{{ url_for('scenario.scenario_page') }}" class="pill-nav-link active">Scenarios</a>
+  </div>
+</nav>
+
+<div class="page-shell">
+  <div class="page-content">
+
+    <header class="page-header">
+      <h1 class="page-title">What If?</h1>
+      <p class="page-sub">Pick a fixture and choose an outcome to see how it shifts the table.</p>
+    </header>
+
+    <div class="scenario-layout">
+
+      <!-- Left: Fixture Selection -->
+      <div class="fixture-panel">
+        <div class="fixture-panel-head">
+          <h2>Upcoming Fixtures</h2>
+          <div class="hint">Select an outcome to run scenario</div>
+        </div>
+        <div class="fixture-list" id="fixture-list">
+          {% for fx in upcoming_fixtures %}
+          <div class="fixture-item" data-home="{{ fx.home_team }}" data-away="{{ fx.away_team }}">
+            <div class="fixture-date">{{ fx.date }}</div>
+            <div class="fixture-matchup">
+              <div class="fixture-team home">
+                <div class="team-badge" style="background: {{ fx.home_color if fx.home_color else 'var(--neutral)' }}">
+                  {{ fx.home_team[:3] | upper }}
+                </div>
+                <div class="team-info">
+                  <div class="team-name">{{ fx.home_team }}</div>
+                  <div class="team-label">Home</div>
+                </div>
+              </div>
+              <div class="fixture-vs">vs</div>
+              <div class="fixture-team away">
+                <div class="team-badge" style="background: {{ fx.away_color if fx.away_color else 'var(--text-muted)' }}">
+                  {{ fx.away_team[:3] | upper }}
+                </div>
+                <div class="team-info">
+                  <div class="team-name">{{ fx.away_team }}</div>
+                  <div class="team-label">Away</div>
+                </div>
+              </div>
+            </div>
+            <div class="outcome-selector">
+              <button type="button" class="outcome-btn" data-outcome="home">
+                {{ fx.home_team.split()[-1] }} Win
+              </button>
+              <button type="button" class="outcome-btn" data-outcome="draw">
+                Draw
+              </button>
+              <button type="button" class="outcome-btn" data-outcome="away">
+                {{ fx.away_team.split()[-1] }} Win
+              </button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Right: Results Table -->
+      <div class="results-panel">
+        <div class="results-head">
+          <h2>Projected Standings</h2>
+          <span class="scenario-badge" id="scenario-badge"></span>
+        </div>
+        <div class="results-scroll">
+          <table class="results-table" id="results-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Team</th>
+                <th class="r">Pts</th>
+                <th class="r">Title %</th>
+                <th class="r">Top 4 %</th>
+                <th class="r">Releg %</th>
+              </tr>
+            </thead>
+            <tbody id="results-tbody">
+              {% for row in baseline.projected_table %}
+                {% if not row.is_separator %}
+                <tr>
+                  <td class="mono">{{ row.position }}</td>
+                  <td class="team-cell">{{ row.team }}</td>
+                  <td class="r mono">{{ row.projected_points if row.projected_points is defined else row.points }}</td>
+                  <td class="r mono">
+                    {% if baseline.probabilities.title[row.team] > 0.5 %}
+                      {{ baseline.probabilities.title[row.team] | round(1) }}%
+                    {% else %}—{% endif %}
+                  </td>
+                  <td class="r mono">
+                    {% if baseline.probabilities.top4[row.team] > 1 %}
+                      {{ baseline.probabilities.top4[row.team] | round(0) | int }}%
+                    {% else %}—{% endif %}
+                  </td>
+                  <td class="r mono">
+                    {% if baseline.probabilities.relegation[row.team] > 1 %}
+                      {{ baseline.probabilities.relegation[row.team] | round(0) | int }}%
+                    {% else %}—{% endif %}
+                  </td>
+                </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function() {
+  const fixtureList = document.getElementById('fixture-list');
+  const resultsTbody = document.getElementById('results-tbody');
+  const scenarioBadge = document.getElementById('scenario-badge');
+
+  // Store baseline data for comparison
+  const baseline = {{ baseline | tojson }};
+
+  // Track current selection
+  let currentSelection = null;
+
+  // Handle outcome button clicks
+  fixtureList.addEventListener('click', async function(e) {
+    const btn = e.target.closest('.outcome-btn');
+    if (!btn) return;
+
+    const fixtureItem = btn.closest('.fixture-item');
+    const homeTeam = fixtureItem.dataset.home;
+    const awayTeam = fixtureItem.dataset.away;
+    const outcome = btn.dataset.outcome;
+
+    // Clear all previous selections
+    document.querySelectorAll('.fixture-item').forEach(item => {
+      item.classList.remove('selected');
+      item.querySelectorAll('.outcome-btn').forEach(b => {
+        b.classList.remove('active', 'home-win', 'draw', 'away-win');
+      });
+    });
+
+    // Set new selection
+    fixtureItem.classList.add('selected');
+    btn.classList.add('active');
+    if (outcome === 'home') btn.classList.add('home-win');
+    if (outcome === 'draw') btn.classList.add('draw');
+    if (outcome === 'away') btn.classList.add('away-win');
+
+    // Update badge
+    const outcomeText = outcome === 'home' ? homeTeam + ' Win' :
+                        outcome === 'away' ? awayTeam + ' Win' : 'Draw';
+    scenarioBadge.textContent = outcomeText;
+    scenarioBadge.classList.add('show');
+
+    // Show loading state
+    resultsTbody.innerHTML = `
+      <tr>
+        <td colspan="6">
+          <div class="loading-state">
+            <div class="loading-spinner"></div>
+            <div>Calculating scenario...</div>
+          </div>
+        </td>
+      </tr>
+    `;
+
+    // Run scenario
+    try {
+      const response = await fetch('/api/scenario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          overrides: [{
+            home_team: homeTeam,
+            away_team: awayTeam,
+            outcome: outcome
+          }]
+        })
+      });
+
+      if (!response.ok) throw new Error('API error');
+
+      const data = await response.json();
+      renderResults(data);
+
+    } catch (err) {
+      resultsTbody.innerHTML = `
+        <tr>
+          <td colspan="6">
+            <div class="empty-state">
+              <div class="empty-state-text">Error running scenario. Please try again.</div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+  });
+
+  function renderResults(data) {
+    const comparison = data.comparison;
+    const scenario = data.scenario;
+    const projectedTable = data.projected_table || baseline.projected_table;
+
+    let html = '';
+
+    projectedTable.forEach((row, idx) => {
+      if (row.is_separator) return;
+
+      const team = row.team;
+      const pts = row.projected_points !== undefined ? row.projected_points : row.points;
+
+      const titlePct = scenario.title[team] || 0;
+      const top4Pct = scenario.top4[team] || 0;
+      const relegPct = scenario.relegation[team] || 0;
+
+      const titleData = comparison.title.find(r => r.team === team);
+      const top4Data = comparison.top_4.find(r => r.team === team);
+      const relegData = comparison.relegation.find(r => r.team === team);
+
+      const titleDelta = titleData ? titleData.change : 0;
+      const top4Delta = top4Data ? top4Data.change : 0;
+      const relegDelta = relegData ? relegData.change : 0;
+
+      html += '<tr>';
+      html += '<td class="mono">' + (idx + 1) + '</td>';
+      html += '<td class="team-cell">' + team + '</td>';
+      html += '<td class="r mono">' + pts + '</td>';
+      html += '<td class="r mono">' + formatCell(titlePct, titleDelta) + '</td>';
+      html += '<td class="r mono">' + formatCell(top4Pct, top4Delta) + '</td>';
+      html += '<td class="r mono">' + formatCell(relegPct, relegDelta) + '</td>';
+      html += '</tr>';
+    });
+
+    resultsTbody.innerHTML = html;
+  }
+
+  function formatCell(pct, delta) {
+    if (pct < 0.5 && Math.abs(delta) < 0.5) return '—';
+
+    let html = pct.toFixed(1) + '%';
+
+    if (Math.abs(delta) >= 0.5) {
+      const sign = delta > 0 ? '+' : '';
+      const cls = delta > 0.5 ? 'pos' : delta < -0.5 ? 'neg' : 'neu';
+      html += '<span class="delta ' + cls + '">(' + sign + delta.toFixed(1) + ')</span>';
+    }
+
+    return html;
+  }
+})();
+</script>
+
+</body>
+</html>

@@ -165,6 +165,25 @@ class PredictionService:
 
         return payload
 
+    def get_upcoming_fixtures_fast(self) -> list[dict[str, Any]]:
+        """
+        Get upcoming fixtures for scenario page (fast version).
+
+        Uses cached dashboard data or featured fixture pool (1-2 matchweeks only).
+        Much faster than predict_all_remaining_matches() which does the entire season.
+        """
+        # Try to get from dashboard cache first
+        cache = self.repository.get_cached_payload('dashboard')
+        if cache:
+            payload = json.loads(cache['payload'])
+            cached_fixtures = payload.get('upcoming_fixtures', [])
+            if cached_fixtures:
+                return cached_fixtures
+
+        # Fallback: compute featured pool (fast - only 1-2 weeks)
+        pool = get_featured_fixture_pool(self.repository)
+        return annotate_upcoming_fixtures(pool, limit=20)
+
     def run_scenario(
         self,
         overrides: list[dict[str, str]],
@@ -273,6 +292,113 @@ class PredictionService:
             "trend": trend,
             "team_error_profile": team_error_profile,
             "freshness": freshness
+        }
+
+    def get_scenario_baseline(self) -> dict[str, Any]:
+        """
+        Extract baseline probabilities from cached dashboard data.
+        Falls back to 500-sim computation on cold start.
+        """
+        cache = self.repository.get_cached_payload('dashboard')
+
+        if cache:
+            payload = json.loads(cache['payload'])
+            projected_table = payload.get('projected_table', [])
+
+            # Build probabilities dict from projected_table rows
+            probabilities: dict[str, dict[str, float]] = {
+                "title": {},
+                "top4": {},
+                "relegation": {},
+            }
+            for row in projected_table:
+                if row.get('is_separator'):
+                    continue
+                team = row['team']
+                probabilities["title"][team] = round(row.get('title_probability', 0) * 100, 1)
+                probabilities["top4"][team] = round(row.get('top_4_probability', 0) * 100, 1)
+                probabilities["relegation"][team] = round(row.get('relegation_probability', 0) * 100, 1)
+
+            return {
+                "meta": payload.get('meta', {}),
+                "projected_table": projected_table,
+                "probabilities": probabilities,
+            }
+
+        # Cold start fallback: run 500 sims
+        FALLBACK_SIMS = 500
+        return self.get_detailed_predictions(FALLBACK_SIMS, self.config.default_seed)
+
+    def run_scenario_fast(
+        self,
+        overrides: list[dict[str, str]],
+        cached_baseline: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Execute what-if scenario using cached baseline (no fresh baseline computation).
+        Runs 500 simulations for scenario.
+        """
+        SCENARIO_SIMS = 500
+        seed = self.config.default_seed
+        league_table = self.repository.get_current_table()
+
+        for scenario in overrides:
+            validate_fixture_override(scenario, set(league_table["team"]))
+
+        scenario_probabilities = simulate_scenario(self.repository, overrides, SCENARIO_SIMS, seed)
+
+        baseline = cached_baseline.get("probabilities", {})
+
+        scenario_probs = {
+            "title": {
+                team: round(scenario_probabilities["title_probabilities"][team] * 100, 1)
+                for team in league_table["team"]
+            },
+            "top4": {
+                team: round(scenario_probabilities["top_4_probabilities"][team] * 100, 1)
+                for team in league_table["team"]
+            },
+            "relegation": {
+                team: round(scenario_probabilities["relegation_probabilities"][team] * 100, 1)
+                for team in league_table["team"]
+            }
+        }
+
+        def compare_metric(metric_key: str) -> list[dict[str, Any]]:
+            baseline_probs = baseline.get(metric_key, {})
+            scenario_vals = scenario_probs.get(metric_key, {})
+
+            rows: list[dict[str, Any]] = []
+            for team in scenario_vals:
+                b = baseline_probs.get(team, 0)
+                s = scenario_vals[team]
+                change = s - b
+                rows.append({
+                    "team": team,
+                    "baseline_prob": b,
+                    "scenario_prob": s,
+                    "change": change,
+                    "change_pct": change * 100,
+                })
+            rows.sort(key=lambda r: abs(r["change"]), reverse=True)
+            return rows
+
+        comparison: dict[str, list[dict[str, Any]]] = {
+            "title": compare_metric("title"),
+            "top_4": compare_metric("top4"),
+            "top_2": compare_metric("top4"),  # Using top4 as proxy
+            "relegation": compare_metric("relegation"),
+        }
+
+        return {
+            "meta": {
+                "simulation_count": SCENARIO_SIMS,
+                "seed": seed
+            },
+            "overrides": overrides,
+            "baseline": baseline,
+            "scenario": scenario_probs,
+            "comparison": comparison,
         }
     
     def compute_dashboard_summary(

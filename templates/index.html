@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard — PremPredictor</title>
-  <!-- Geist fonts: sharp, confident, technical -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/style.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-mono/style.min.css" rel="stylesheet">
@@ -139,11 +138,57 @@
     .standings-table td.mono { color: var(--text-secondary); }
     .fc--motw .fc-teams { font-size: var(--text-base); font-weight: var(--weight-bold); margin-top: var(--sp-2); }
 
+    /* ── Pill Navigation ── */
+    .pill-nav {
+      display: flex;
+      justify-content: center;
+      padding: var(--sp-4) 0;
+    }
+
+    .pill-nav-inner {
+      display: inline-flex;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px;
+    }
+
+    .pill-nav-link {
+      padding: var(--sp-2) var(--sp-4);
+      border-radius: 999px;
+      font-size: var(--text-sm);
+      font-weight: var(--weight-semibold);
+      color: var(--text-secondary);
+      text-decoration: none;
+      min-width: 120px;
+      text-align: center;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .pill-nav-link:hover {
+      background: var(--surface-raised);
+      color: var(--text-primary);
+    }
+
+    .pill-nav-link.active {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .site-main {
+      min-height: 100vh;
+      background: var(--bg);
+    }
+
     @media (max-width: 900px) {
       .hero-body { grid-template-columns: 1fr; }
       .hero-team--away { align-items: flex-start; }
       .hero-team--away .hero-team-name-row { flex-direction: row; }
       .hero-centre { min-width: unset; width: 100%; }
+    }
+    @media (max-width: 768px) {
+      .pill-nav { padding: var(--sp-3) var(--sp-2); }
+      .pill-nav-link { min-width: 100px; padding: var(--sp-2) var(--sp-3); }
     }
     @media (max-width: 640px) { .hero-stakes { flex-direction: column; gap: var(--sp-3); } }
   </style>
@@ -202,32 +247,13 @@
   'Wolverhampton Wanderers': 'https://resources.premierleague.com/premierleague/badges/100/t39.png'
 } %}
 
-{# ════════════════════════════════
-   SIDEBAR
-════════════════════════════════ #}
-<aside class="site-sidebar">
-  <a href="{{ url_for('dashboard.dashboard_page') }}" class="brand">
-    PremPredictor <em>{{ meta.season_label if meta else '2026/27' }}</em>
-  </a>
-
-  <nav class="site-nav">
-    <a href="{{ url_for('dashboard.dashboard_page') }}" class="active">Dashboard</a>
-    <a href="{{ url_for('predictions.predictions_page') }}">Predictions</a>
-    <a href="{{ url_for('fixtures.fixtures_page') }}">Fixtures</a>
-    <a href="{{ url_for('predictions.predictions_page') }}#scenario">Scenario</a>
-    <a href="{{ url_for('accuracy.accuracy_page') }}">Accuracy</a>
-  </nav>
-
-  <div class="sidebar-footer">
-    <div><span class="dot"></span> Live</div>
-    <div>Matchweek {{ meta.matchweek if meta else '—' }}</div>
-    <div>{{ last_updated if last_updated else 'N/A' }}</div>
+<nav class="pill-nav">
+  <div class="pill-nav-inner">
+    <a href="{{ url_for('dashboard.dashboard_page') }}" class="pill-nav-link active">Dashboard</a>
+    <a href="{{ url_for('scenario.scenario_page') }}" class="pill-nav-link">Scenarios</a>
   </div>
-</aside>
+</nav>
 
-{# ════════════════════════════════
-   MAIN CONTENT
-════════════════════════════════ #}
 <div class="site-main">
 <div class="dashboard">
 
@@ -236,9 +262,6 @@
     <div class="dash-greeting">
       <p class="breadcrumb-trail">DASHBOARD › GW{{ meta.matchweek if meta else '—' }}</p>
       <h1>Season <strong>{{ meta.season_label if meta else '2026/27' }}</strong></h1>
-      <p>
-        {{ "{:,}".format(simulation_count) if simulation_count else '—' }} Monte Carlo simulations
-      </p>
     </div>
     <div class="dash-clock" id="js-clock" aria-live="polite"></div>
   </div>
@@ -324,7 +347,7 @@
       {% endif %}
     </div>
 
-  </div>{# /feature-cards #}
+  </div>
 
   {# ── Hero match detail ── #}
   {% if hero_match %}
@@ -416,7 +439,7 @@
         {% endif %}
       </div>
 
-    </div>{# /hero-body #}
+    </div>
 
     {# Stakes rows #}
     {% if hero_match.stakes %}
@@ -434,7 +457,7 @@
       </div>
     {% endif %}
 
-  </div>{# /hero-panel #}
+  </div>
   {% endif %}
 
   {# ── 2-column body ── #}
@@ -448,11 +471,9 @@
         <div class="panel-head">
           <div>
             <h2>Projected Final Standings</h2>
-            <span class="hint">
-              {{ "{:,}".format(simulation_count) if simulation_count else '—' }} simulations &middot; {{ meta.season_label if meta else '' }}
-            </span>
+            <span class="hint">{{ meta.season_label if meta else '' }}</span>
           </div>
-          <a href="{{ url_for('predictions.predictions_page') }}">Full analysis →</a>
+          <a href="{{ url_for('scenario.scenario_page') }}">What if? →</a>
         </div>
 
         <div class="standings-scroll">
@@ -530,7 +551,7 @@
             <span class="zone-dot" style="background:var(--negative)"></span> Relegation
           </div>
         </div>
-      </div>{# /panel-A #}
+      </div>
 
       {# Panel B: Decisive Fixtures (Critical Games) #}
       {% if critical_games %}
@@ -566,7 +587,7 @@
           {% endfor %}
         </div>
       </div>
-      {% endif %}{# /critical_games #}
+      {% endif %}
 
       {# Panel C: Race Standings (real data) #}
       {% if title_favorites or top_4_race %}
@@ -617,9 +638,9 @@
           {% endif %}
         </div>
       </div>
-      {% endif %}{# /race-standings #}
+      {% endif %}
 
-    </div>{# /dash-main #}
+    </div>
 
     {# ═══ RIGHT RAIL ═══ #}
     <div class="dash-stats">
@@ -632,7 +653,6 @@
             <h2>Upcoming Fixtures</h2>
             <span class="hint">Next {{ upcoming_fixtures | length }} matches</span>
           </div>
-          <a href="{{ url_for('fixtures.fixtures_page') }}">All →</a>
         </div>
 
         {% for fx in upcoming_fixtures %}
@@ -668,7 +688,7 @@
           </div>
         {% endfor %}
       </div>
-      {% endif %}{# /upcoming_fixtures #}
+      {% endif %}
 
       {# Panel E: Form Pulse #}
       {% if form_pulse and form_pulse.in_form %}
@@ -713,7 +733,7 @@
         </div>
         {% endif %}
       </div>
-      {% endif %}{# /form_pulse #}
+      {% endif %}
 
       {# Panel F: Relegation Watch #}
       {% if relegation_race %}
@@ -742,17 +762,16 @@
           {% endfor %}
         </div>
       </div>
-      {% endif %}{# /relegation_watch #}
+      {% endif %}
 
-    </div>{# /dash-stats #}
+    </div>
 
-  </div>{# /dash-body #}
+  </div>
 
-</div>{# /dashboard #}
-</div>{# /site-main #}
+</div>
+</div>
 
 <script>
-  /* Form pulse tab toggle */
   function switchForm(e, which) {
     document.querySelectorAll('.form-tabs button').forEach(function(b) {
       b.classList.remove('active');
@@ -764,25 +783,21 @@
     if (cold) cold.classList.toggle('hidden', which !== 'cold');
   }
 
-  /* Prob-track bar widths — fixture tracks + hero bar */
   document.querySelectorAll('.prob-track[data-hw], .hero-prob-bar[data-hw]').forEach(function(track) {
     track.querySelector('.h').style.width = track.dataset.hw + '%';
     track.querySelector('.d').style.width = track.dataset.dw + '%';
     track.querySelector('.a').style.width = track.dataset.aw + '%';
   });
 
-  /* Team crest colors */
   document.querySelectorAll('.crest[data-color]').forEach(function(el) {
     el.style.background = el.dataset.color;
   });
 
-  /* Race standings bars — animated fill */
   document.querySelectorAll('.race-bar[data-pct]').forEach(function(bar) {
     var fill = bar.querySelector('.race-bar-fill');
     if (fill) setTimeout(function() { fill.style.width = bar.dataset.pct + '%'; }, 80);
   });
 
-  /* Live clock */
   (function() {
     var el = document.getElementById('js-clock');
     if (!el) return;

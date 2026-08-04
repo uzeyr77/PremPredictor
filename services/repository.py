@@ -3,7 +3,7 @@ import pandas as pd
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
-from database import get_db_connection
+from database import get_db_connection, get_db_connection_string
 from config import load_config
 from models.contracts import DashboardSummary
 
@@ -19,6 +19,10 @@ class PredictionRepository:
             yield conn
         finally:
             conn.close()
+
+    def _get_connection_string(self):
+        """Get connection string for pandas operations."""
+        return get_db_connection_string()
 
     def assert_required_tables(self) -> None:
         required = {"league_table_2026", "match_data", "prem_teams_2026", "league_table_2024_final", "prem_teams_2024"}
@@ -36,25 +40,20 @@ class PredictionRepository:
                     raise ValueError(f"Missing required tables: {sorted(missing)}")
 
     def get_current_table(self) -> pd.DataFrame:
-        with self._connect() as conn:
-            return pd.read_sql_query("SELECT * FROM league_table_2026", conn)
+        return pd.read_sql_query("SELECT * FROM league_table_2026", self._get_connection_string())
 
     def get_team_statistics(self) -> pd.DataFrame:
-        with self._connect() as conn:
-            team_stats = pd.read_sql_query("SELECT * FROM prem_teams_2026", conn)
-            return team_stats.drop(columns=["goals_scored", "goals_conceded"])
+        team_stats = pd.read_sql_query("SELECT * FROM prem_teams_2026", self._get_connection_string())
+        return team_stats.drop(columns=["goals_scored", "goals_conceded"])
 
     def get_match_data(self) -> pd.DataFrame:
-        with self._connect() as conn:
-            return pd.read_sql_query("SELECT * FROM match_data", conn)
+        return pd.read_sql_query("SELECT * FROM match_data", self._get_connection_string())
 
     def get_team_stats_2024(self) -> pd.DataFrame:
-        with self._connect() as conn:
-            return pd.read_sql_query("SELECT * FROM prem_teams_2024", conn)
+        return pd.read_sql_query("SELECT * FROM prem_teams_2024", self._get_connection_string())
 
     def get_league_table_2024(self) -> pd.DataFrame:
-        with self._connect() as conn:
-            return pd.read_sql_query("SELECT * FROM league_table_2024_final", conn)
+        return pd.read_sql_query("SELECT * FROM league_table_2024_final", self._get_connection_string())
 
     def get_matchweek(self) -> int:
         played = self.get_match_data()
