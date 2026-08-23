@@ -13,17 +13,20 @@ import os
 import sys
 from pathlib import Path
 
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
+    
+from database import get_db_connection
+from config import load_config
 
 import requests
 from dotenv import load_dotenv
 
 load_dotenv(_PROJECT_ROOT / ".env")
 
-from database import get_db_connection
-from config import load_config
+
 
 SEASON = load_config().current_season
 API_KEY = os.getenv("FOOTBALL_DATA_API_KEY")
