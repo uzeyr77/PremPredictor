@@ -65,7 +65,8 @@ class PredictionService:
         fp = self.repository.db_fingerprint()
         cache = self.repository.get_cached_payload('dashboard')
 
-        if cache:
+        if cache and cache['fingerprint'] == fp:
+            print("from cache")
             return json.loads(cache['payload'])
 
         payload = self.compute_dashboard_summary(

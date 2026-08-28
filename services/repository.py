@@ -2,12 +2,37 @@ import json
 import pandas as pd
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from threading import Lock
+from time import time
 
 from database import get_db_connection, get_db_connection_string
 from config import load_config
 from models.contracts import DashboardSummary
 
 _CURRENT_SEASON = load_config().current_season
+
+# In-memory cache to avoid DB round-trips on every page load
+_memory_cache: dict[str, tuple[float, dict]] = {}  # key -> (expires_at, data)
+_cache_lock = Lock()
+_MEMORY_CACHE_TTL = 300  # 5 minutes
+
+
+def _get_from_memory_cache(key: str) -> dict | None:
+    """Get value from in-memory cache if not expired."""
+    with _cache_lock:
+        if key in _memory_cache:
+            expires_at, data = _memory_cache[key]
+            if time() < expires_at:
+                return data
+            del _memory_cache[key]
+    return None
+
+
+def _set_memory_cache(key: str, data: dict, ttl: int = _MEMORY_CACHE_TTL) -> None:
+    """Store value in in-memory cache."""
+    with _cache_lock:
+        _memory_cache[key] = (time() + ttl, data)
+
 
 class PredictionRepository:
     pass
@@ -93,6 +118,7 @@ class PredictionRepository:
     
     def upsert_cache(self, cache_key: str, fingerprint:str, payload:DashboardSummary, ttl_seconds = 1800):
         now = datetime.now(timezone.utc).isoformat()
+        payload_json = json.dumps(payload)
         with self._connect() as conn:
             with conn.cursor() as cursor:
                 cursor.execute("""INSERT into dashboard_cache (cache_key, fingerprint, payload, computed_at, ttl_seconds)
@@ -103,16 +129,31 @@ class PredictionRepository:
                     computed_at = excluded.computed_at,
                     ttl_seconds = excluded.ttl_seconds
                 """,
-                (cache_key, fingerprint, json.dumps(payload), now , ttl_seconds),
+                (cache_key, fingerprint, payload_json, now , ttl_seconds),
             )
                 conn.commit()
+
+        # Update in-memory cache too
+        _set_memory_cache(f"payload:{cache_key}", {
+            'fingerprint': fingerprint,
+            'payload': payload_json,
+            'computed_at': now,
+            'ttl_seconds': ttl_seconds
+        })
 
     def get_cached_payload(self, cache_key:str) -> dict | None:
         if not cache_key:
             raise ValueError("the cache_key cannot be empty")
+
+        # Check in-memory cache first (instant)
+        cached = _get_from_memory_cache(f"payload:{cache_key}")
+        if cached is not None:
+            return cached
+
+        # Fall back to database
         query = """
-                SELECT fingerprint, payload, computed_at, ttl_seconds 
-                FROM dashboard_cache 
+                SELECT fingerprint, payload, computed_at, ttl_seconds
+                FROM dashboard_cache
                 WHERE cache_key = %s
                 """
         with self._connect() as conn:
@@ -123,12 +164,15 @@ class PredictionRepository:
                 if row is None:
                     return None
                 else:
-                    return {
+                    result = {
                         'fingerprint': row[0],
                         'payload': row[1],
                         'computed_at': row[2],
                         'ttl_seconds': row[3]
                     }
+                    # Store in memory cache for subsequent requests
+                    _set_memory_cache(f"payload:{cache_key}", result)
+                    return result
     def quick_check(self):
         with self._connect() as conn:
             with conn.cursor() as cur:
