@@ -94,6 +94,13 @@ def sync(records: list):
     cursor = conn.cursor()
     updated_rows = 0
     
+    records.sort(
+                key=lambda r: (
+                    -r['points'],
+                    -(r['goals_for'] - r['goals_against']),
+                    -r['goals_for']
+                )
+            )
     try:
         
         for r in records:  
@@ -109,14 +116,7 @@ def sync(records: list):
         
             )
             updated_rows = updated_rows + 1
-            print(r['team'])
-        records.sort(
-            key=lambda r: (
-                -r['points'],
-                -(r['goals_for'] - r['goals_against']),
-                -r['goals_for']
-            )
-        )
+        
         conn.commit()
         
     except Exception:

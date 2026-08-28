@@ -1,9 +1,5 @@
 """
-Recompute the dashboard payload and store it in the Postgres dashboard_cache.
-
-Designed for Task Scheduler: loads .env explicitly from the project root so
-the working directory does not matter, always forces a fresh compute, and
-prints timestamped progress for log files.
+Recompute the dashboard payload and store it in the db
 
 Run:
     python scripts/jobs/refresh_cache.py
@@ -47,7 +43,7 @@ def main() -> int:
 
     # Force a fresh compute (do NOT go through get_dashboard_summary, which
     # returns early on a cache hit and would make this job a no-op).
-    log("computing dashboard summary (this is the slow part)...")
+    log("computing dashboard summary...")
     payload = service.compute_dashboard_summary(cfg.default_simulations, cfg.default_seed)
 
     repo.upsert_cache('dashboard', fingerprint, payload)
