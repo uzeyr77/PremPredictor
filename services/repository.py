@@ -65,7 +65,9 @@ class PredictionRepository:
                     raise ValueError(f"Missing required tables: {sorted(missing)}")
 
     def get_current_table(self) -> pd.DataFrame:
-        return pd.read_sql_query("SELECT * FROM league_table_2026", self._get_connection_string())
+        return pd.read_sql_query("""SELECT * FROM league_table_2026
+                                  ORDER BY points DESC, (goals_for - goals_against) DESC, 
+                                  goals_for DESC""", self._get_connection_string())
 
     def get_team_statistics(self) -> pd.DataFrame:
         team_stats = pd.read_sql_query("SELECT * FROM prem_teams_2026", self._get_connection_string())
