@@ -24,7 +24,7 @@ DERBIES = {
     frozenset(["Newcastle", "Sunderland"]): "Tyne-Wear Derby",
 }
 MIN_EXPECTED_SWING = 0.02  # below this, no critical match is returned
-SWING_SIMULATIONS_CAP = 500  # scenario sims for swing/stakes (faster than full dashboard sims)
+SWING_SIMULATIONS_CAP = 50  # scenario sims for swing/stakes (faster than full dashboard sims)
 OUTCOMES = ["home_win", "draw", "away_win"]
 METRICS = ["title", "top_4", "relegation"]
 RACE_LABELS = {
