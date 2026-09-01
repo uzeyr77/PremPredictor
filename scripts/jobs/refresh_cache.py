@@ -26,7 +26,7 @@ def log(msg: str) -> None:
     print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}", flush=True)
 
 
-def main() -> int:
+def refresh_cache() -> int:
     started = time.perf_counter()
     log("refresh_cache starting")
 
@@ -54,7 +54,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     try:
-        sys.exit(main())
+        sys.exit(refresh_cache())
     except Exception as e:
         log(f"FAILED: {type(e).__name__}: {e}")
         raise

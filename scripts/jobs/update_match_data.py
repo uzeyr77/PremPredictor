@@ -64,7 +64,7 @@ def fetch_matches() -> list[dict]:
 
 
 # turn api json -> db record
-def build_records(matches: list[dict]) -> list[dict]:
+def build_records_for_match_data(matches: list[dict]) -> list[dict]:
     records = []
     skipped = []
     for match in matches:
@@ -92,7 +92,7 @@ def build_records(matches: list[dict]) -> list[dict]:
     return records
 
 
-def sync(records: list[dict]) -> None:
+def sync_match_data_records(records: list[dict]) -> None:
     conn = get_db_connection()
     cursor = conn.cursor()
     updated_results = 0
@@ -170,8 +170,8 @@ def sync(records: list[dict]) -> None:
 def main() -> None:
     matches = fetch_matches()
     print(f"API returned {len(matches)} matches for season {SEASON}")
-    records = build_records(matches)
-    sync(records)
+    records = build_records_for_match_data(matches)
+    sync_match_data_records(records)
     print("update_match_data complete")
 
 

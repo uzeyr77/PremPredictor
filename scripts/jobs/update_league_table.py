@@ -48,7 +48,7 @@ TEAM_NAME_MAP = {
 }
 
 
-def fetch_standings():
+def fetch_standings_for_league_table():
     response = requests.get(url=URL, headers = {'X-Auth-Token': API_KEY}, timeout = 30)
     response.raise_for_status()
     standings = response.json().get('standings', [])[0]["table"]
@@ -56,7 +56,7 @@ def fetch_standings():
     
     return standings
 
-def build_records(standings:list):
+def build_records_for_league_table(standings:list):
     records = []
     skipped = []
     
@@ -89,7 +89,7 @@ def build_records(standings:list):
         print(f"WARNING: {len(skipped)} matches skipped (unmapped team names): {set(skipped)}")
     return records
 
-def sync(records: list):
+def sync_records_for_league_table(records: list):
     conn = get_db_connection()
     cursor = conn.cursor()
     updated_rows = 0
@@ -125,12 +125,12 @@ def sync(records: list):
     finally:
         conn.close()
     print(f"rows updated {updated_rows}")
-    
+    print(records)
 
 def main():
-    standings = fetch_standings()
-    records = build_records(standings)
-    sync(records)
+    standings = fetch_standings_for_league_table()
+    records = build_records_for_league_table(standings)
+    sync_records_for_league_table(records)
 
 if __name__ == "__main__":
     main()
