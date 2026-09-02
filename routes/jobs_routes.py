@@ -3,8 +3,6 @@ from __future__ import annotations
 import os
 import threading
 from datetime import datetime
-
-import requests
 from flask import Blueprint, current_app, jsonify, request
 
 from database import get_db_connection
@@ -29,30 +27,6 @@ def _verify_job_secret() -> tuple[dict, int] | None:
         return {'error': 'Invalid job secret'}, 403
 
     return None
-
-
-TEAM_NAME_MAP = {
-    'Brighton Hove': 'Brighton',
-    'Coventry City': 'Coventry City',
-    'Nottingham': 'Nottm Forest',
-    'Leeds United': 'Leeds',
-    'Liverpool': 'Liverpool',
-    'Ipswich Town': 'Ipswich Town',
-    'Chelsea': 'Chelsea',
-    'Everton': 'Everton',
-    'Tottenham': 'Tottenham',
-    'Bournemouth': 'Bournemouth',
-    'Aston Villa': 'Aston Villa',
-    'Man City': 'Man City',
-    'Sunderland': 'Sunderland',
-    'Brentford': 'Brentford',
-    'Newcastle': 'Newcastle',
-    'Arsenal': 'Arsenal',
-    'Fulham': 'Fulham',
-    'Crystal Palace': 'Crystal Palace',
-    'Hull City': 'Hull City',
-    'Man United': 'Man United',
-}
 
 
 def _run_refresh_cache(app) -> None:
@@ -96,7 +70,7 @@ def _run_update_match_data(app) -> None:
         try:
             print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] update_match_data job started")
             matches = fetch_matches()
-            records = build_records(matches)
+            records = build_records_for_match_data(matches)
             sync_match_data_records(records)
             print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] update_match_data complete")
         except Exception as e:
@@ -150,19 +124,7 @@ def trigger_update_league_table():
         'job': 'update-league-table',
         'message': 'league table sync running in background'
     }), 202
-    
-@jobs.post("/api/jobs/refresh-cache")
-def _trigger_refresh_cache():
-    error = _verify_job_secret()
-    
-    if error:
-        return error
-    
-    
-    app = current_app._get_current_object()
-    thread = threading.Thread(target=_run_refresh_cache, args=(app,), daemon=True)
-    thread.start()
-    
+
     return jsonify({
         'status': 'started',
         'job': 'refresh-cache',
