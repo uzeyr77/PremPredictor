@@ -57,17 +57,20 @@
   --accent-active:  oklch(70% 0.14 280);
   --accent-soft:    oklch(75% 0.16 280 / 0.12);
 
-  /* ── Semantic colors ── */
-  --positive:       oklch(70% 0.18 145);
-  --warning:        oklch(75% 0.18 75);
-  --negative:       oklch(60% 0.20 25);
-  --neutral:        oklch(55% 0.02 280);
+  /* ── Semantic colors — vibrant but not garish ── */
+  --positive:       oklch(72% 0.21 145);  /* richer green */
+  --positive-soft:  oklch(72% 0.21 145 / 0.15);
+  --warning:        oklch(78% 0.20 85);   /* warmer gold */
+  --warning-soft:   oklch(78% 0.20 85 / 0.15);
+  --negative:       oklch(62% 0.23 25);   /* stronger red */
+  --negative-soft:  oklch(62% 0.23 25 / 0.15);
+  --neutral:        oklch(58% 0.04 280);  /* slightly more chromatic */
 
-  /* Zone backgrounds — subtle tints */
-  --zone-title-bg:  oklch(75% 0.18 75 / 0.08);
-  --zone-top4-bg:   oklch(70% 0.18 145 / 0.08);
-  --zone-eu-bg:     oklch(55% 0.02 280 / 0.10);
-  --zone-releg-bg:  oklch(60% 0.20 25 / 0.08);
+  /* Zone backgrounds — stronger tints for visual interest */
+  --zone-title-bg:  oklch(78% 0.20 85 / 0.12);
+  --zone-top4-bg:   oklch(72% 0.21 145 / 0.12);
+  --zone-eu-bg:     oklch(75% 0.16 280 / 0.12);
+  --zone-releg-bg:  oklch(62% 0.23 25 / 0.12);
 
   /* Additional semantic colors */
   --ucl:            oklch(65% 0.15 260);
@@ -245,15 +248,15 @@ body {
   outline-offset: 2px;
 }
 
-/* Feature cards — subtle background tints (no top borders) */
-.fc--motw  { background: var(--zone-top4-bg); }
-.fc--title { background: var(--zone-title-bg); }
-.fc--ucl   { background: var(--ucl-bg); }
-.fc--releg { background: var(--zone-releg-bg); }
+/* Feature cards — stronger background tints with colored numbers */
+.fc--motw  { background: var(--zone-top4-bg); border-color: oklch(72% 0.21 145 / 0.2); }
+.fc--title { background: var(--zone-title-bg); border-color: oklch(78% 0.20 85 / 0.2); }
+.fc--ucl   { background: var(--ucl-bg); border-color: var(--accent); }
+.fc--releg { background: var(--zone-releg-bg); border-color: oklch(62% 0.23 25 / 0.2); }
 
-.fc--motw  .fc-big-number { color: var(--text-primary); }
+.fc--motw  .fc-big-number { color: var(--positive); }
 .fc--title .fc-big-number { color: var(--warning); }
-.fc--ucl   .fc-big-number { color: var(--ucl); }
+.fc--ucl   .fc-big-number { color: var(--accent); }
 .fc--releg .fc-big-number { color: var(--negative); }
 
 .fc-eyebrow {
@@ -366,16 +369,17 @@ body {
 }
 
 .sc-accent {
-  width: 3px;
+  width: 4px;
   min-height: 32px;
-  border-radius: 2px;
+  border-radius: 3px;
   background: var(--accent);
   flex-shrink: 0;
 }
 
 .sc-accent--gold { background: var(--warning); }
-.sc-accent--blue { background: var(--ucl); }
+.sc-accent--blue { background: var(--accent); }
 .sc-accent--red  { background: var(--negative); }
+.sc-accent--green { background: var(--positive); }
 
 .sc-value {
   font-size: var(--text-2xl);
@@ -517,11 +521,17 @@ body {
 .th-crest,
 .td-crest { width: 32px; padding: 4px 4px 4px 12px; }
 
-/* Zone indicators — background tints (no side-stripes) */
+/* Zone indicators — stronger background tints */
 .zone-title { background: var(--zone-title-bg); }
 .zone-top4  { background: var(--zone-top4-bg); }
 .zone-eu    { background: var(--zone-eu-bg); }
 .zone-releg { background: var(--zone-releg-bg); }
+
+/* Hover states gain subtle color */
+.zone-title:hover { background: oklch(78% 0.20 85 / 0.18); }
+.zone-top4:hover  { background: oklch(72% 0.21 145 / 0.18); }
+.zone-eu:hover    { background: oklch(75% 0.16 280 / 0.18); }
+.zone-releg:hover { background: oklch(62% 0.23 25 / 0.18); }
 
 .c-green { color: var(--positive); }
 .c-gold  { color: var(--warning); }
@@ -759,10 +769,10 @@ body {
   border-color: var(--border-hover);
 }
 
-/* Race cards — background tints (no side-stripes) */
-.critical-card.race-title { background: var(--zone-title-bg); }
-.critical-card.race-top4  { background: var(--zone-top4-bg); }
-.critical-card.race-releg { background: var(--zone-releg-bg); }
+/* Race cards — stronger background tints with colored borders */
+.critical-card.race-title { background: var(--zone-title-bg); border-color: oklch(78% 0.20 85 / 0.25); }
+.critical-card.race-top4  { background: var(--zone-top4-bg); border-color: oklch(72% 0.21 145 / 0.25); }
+.critical-card.race-releg { background: var(--zone-releg-bg); border-color: oklch(62% 0.23 25 / 0.25); }
 
 .critical-card .swing {
   font-size: var(--text-lg);
@@ -773,9 +783,9 @@ body {
   color: var(--text-primary);
 }
 
-.critical-card.race-title .swing  { color: var(--warning); }
-.critical-card.race-top4 .swing   { color: var(--positive); }
-.critical-card.race-releg .swing  { color: var(--negative); }
+.critical-card.race-title .swing  { color: var(--warning); font-weight: var(--weight-black); }
+.critical-card.race-top4 .swing   { color: var(--positive); font-weight: var(--weight-black); }
+.critical-card.race-releg .swing  { color: var(--negative); font-weight: var(--weight-black); }
 
 .critical-card .matchup {
   display: flex;
@@ -830,6 +840,7 @@ body {
   border-radius: var(--radius-sm);
   position: relative;
   overflow: hidden;
+  background: oklch(95% 0.005 280) !important;
 }
 
 .crest-lg { width: 52px; height: 52px; border-radius: 10px; }
@@ -842,14 +853,15 @@ body {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 12%;
+  padding: 8%;
+  z-index: 2;
 }
 
 .crest:has(.crest-img) .crest-txt { display: none; }
 
 .crest-txt {
   font-weight: var(--weight-black);
-  color: oklch(100% 0 0);
+  color: oklch(30% 0.005 280);
   position: relative;
   z-index: 1;
 }

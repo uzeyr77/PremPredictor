@@ -5,7 +5,6 @@ import threading
 from datetime import datetime
 from flask import Blueprint, current_app, jsonify, request
 
-from database import get_db_connection
 from scripts.jobs.update_league_table import build_records_for_league_table, fetch_standings_for_league_table, sync_records_for_league_table
 from scripts.jobs.refresh_cache import refresh_cache
 from scripts.jobs.update_match_data import build_records_for_match_data, sync_match_data_records, fetch_matches 
@@ -68,13 +67,13 @@ def trigger_refresh_cache():
 def _run_update_match_data(app) -> None:
     with app.app_context():
         try:
-            print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] update_match_data job started")
+            print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] update_match_data job started", flush=True)
             matches = fetch_matches()
             records = build_records_for_match_data(matches)
             sync_match_data_records(records)
-            print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] update_match_data complete")
+            print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] update_match_data complete", flush = True)
         except Exception as e:
-            print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] FAILED: {e}")
+            print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] FAILED: {e}", flush = True)
     
             
             
@@ -99,13 +98,13 @@ def trigger_update_match_data():
 def _run_update_league_table(app):
     with app.app_context():
         try:
-             print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] update league table job started")
+             print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] update league table job started", flush = True)
              standings = fetch_standings_for_league_table()
              records = build_records_for_league_table(standings)
              sync_records_for_league_table(records)
-             print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] update league table job complete")
+             print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] update league table job complete", flush = True)
         except Exception as e:
-            print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] FAILED: {e}")
+            print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] FAILED: {e}", flush = True)
             
 @jobs_bp.post("/api/jobs/update-league-table")
 def trigger_update_league_table():
