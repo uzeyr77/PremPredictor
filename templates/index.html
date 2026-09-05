@@ -12,7 +12,7 @@
     /* ── Breadcrumb ── */
     .breadcrumb-trail {
       font-size: var(--text-xs);
-      letter-spacing: var(--tracking-wide);
+      letter-spacing: var(--tracking-label);  /* section label: tight tracking */
       text-transform: uppercase;
       color: var(--text-muted);
       margin: 0 0 6px;
@@ -73,13 +73,13 @@
     .hero-prob-labels small {
       display: block; font-size: var(--text-xs); font-weight: var(--weight-medium);
       font-family: var(--font); color: var(--text-muted); margin-top: 2px;
-      text-transform: uppercase; letter-spacing: var(--tracking-wide);
+      text-transform: uppercase; letter-spacing: var(--tracking-data);  /* data label */
     }
 
     .h2h-row {
       display: flex; align-items: center; gap: 4px;
       font-size: var(--text-xs); font-weight: var(--weight-bold);
-      letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--text-muted);
+      letter-spacing: var(--tracking-data); text-transform: uppercase; color: var(--text-muted);  /* data label */
     }
     .h2h-dot {
       width: 14px; height: 14px; border-radius: 3px;
@@ -97,13 +97,13 @@
     }
     .xg-label {
       font-size: var(--text-xs); font-weight: var(--weight-bold);
-      letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--text-muted);
+      letter-spacing: var(--tracking-data); text-transform: uppercase; color: var(--text-muted);  /* data label */
     }
 
     /* Stakes rows */
     .hero-stakes { border-top: 1px solid var(--border); padding: var(--sp-2) var(--sp-3); display: flex; gap: var(--sp-3); flex-wrap: wrap; }
     .stake-row { display: flex; flex-direction: column; gap: 3px; min-width: 160px; }
-    .stake-race { font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--text-muted); }
+    .stake-race { font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-muted); }  /* section label */
     .stake-desc { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text-primary); }
     .stake-delta { font-size: var(--text-sm); font-weight: var(--weight-bold); font-family: var(--mono); }
     .stake-delta.pos { color: var(--positive); }
@@ -114,7 +114,7 @@
     .race-standings-body { padding: var(--sp-2) var(--sp-3) var(--sp-3); display: flex; flex-direction: column; gap: 6px; }
     .race-section-label {
       font-size: var(--text-xs); font-weight: var(--weight-bold);
-      letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--text-muted);
+      letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-muted);  /* section label */
       padding: var(--sp-2) 0 var(--sp-1); margin-top: var(--sp-1); border-top: 1px solid var(--border);
     }
     .race-section-label:first-child { border-top: none; margin-top: 0; }
@@ -328,7 +328,7 @@
         </div>
         <div class="fc-badge-pill">{{ hero_match.badge }}</div>
         <div class="fc-foot">
-          <span>{{ hero_match.date | friendly_date }}</span>
+          <span>{{ hero_match.date }}</span>
           <span>{{ (hero_match.home_win_prob * 100) | round(0) | int }}% home win</span>
         </div>
       {% else %}
@@ -400,9 +400,9 @@
     <div class="panel-head">
       <div>
         <h2>Featured Match</h2>
-        <span class="hint">{{ hero_match.badge }} &middot; {{ hero_match.date | friendly_date }}</span>
+        <span class="hint">{{ hero_match.badge }} &middot; {{ hero_match.date }}</span>
       </div>
-      <span style="font-size:11px; color:var(--text-muted); font-weight:600; letter-spacing:0.06em; text-transform:uppercase;">
+      <span style="font-size:11px; color:var(--text-muted); font-weight:600; letter-spacing:var(--tracking-data); text-transform:uppercase;">
         GW{{ hero_match.matchweek }}
       </span>
     </div>
@@ -626,7 +626,7 @@
               </div>
               <div class="foot">
                 <span>{{ game.badge }}</span>
-                <span>{{ game.date | friendly_date }}</span>
+                <span>{{ game.date }}</span>
               </div>
             </div>
           {% endfor %}
@@ -704,7 +704,7 @@
           {% set fav_home = fx.home_win_prob >= fx.away_win_prob %}
           <div class="fixture-card">
             <div class="top">
-              <span class="date">{{ fx.date | friendly_date }}</span>
+              <span class="date">{{ fx.date }}</span>
               <span class="pick{% if fx.pick == 'Toss-up' %} tossup{% endif %}">{{ fx.pick }}</span>
             </div>
             <div class="fixture-row{% if fav_home %} fixture-row--fav{% endif %}">
