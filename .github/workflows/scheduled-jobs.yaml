@@ -1,32 +1,44 @@
-  name: Scheduled Jobs
+name: Scheduled Jobs
 
-  on:
-    schedule:
-      # Update match data: every 6 hours
-      - cron: '0 */6 * * *'
-      # Refresh cache: every hour
-      - cron: '0 * * * *'
-    workflow_dispatch:  # Allow manual triggers
+on:
+  schedule:
+    # Update data: every 6 hours (match data + league table)
+    - cron: '0 */6 * * *'
+    # Refresh cache: every hour
+    - cron: '0 * * * *'
+  workflow_dispatch:  # Allow manual triggers
 
-  jobs:
-    update-match-data:
-      runs-on: ubuntu-latest
-      if: github.event.schedule == '0 */6 * * *' || github.event_name == 'workflow_dispatch'
-      steps:
-        - name: Call update-match-data endpoint
-          run: |
-            curl -X POST \
-              -H "Authorization: Bearer ${{ secrets.JOB_SECRET }}" \
-              -H "Content-Type: application/json" \
-              https://prempredictor-pz93.onrender.com/
+jobs:
+  update-match-data:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 */6 * * *' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Call update-match-data endpoint
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.JOB_SECRET }}" \
+            -H "Content-Type: application/json" \
+            https://prempredictor-pz93.onrender.com/api/jobs/update-match-data
 
-    refresh-cache:
-      runs-on: ubuntu-latest
-      if: github.event.schedule == '0 * * * *' || github.event_name == 'workflow_dispatch'
-      steps:
-        - name: Call refresh-cache endpoint
-          run: |
-            curl -X POST \
-              -H "Authorization: Bearer ${{ secrets.JOB_SECRET }}" \
-              -H "Content-Type: application/json" \
-              https://prempredictor-pz93.onrender.com/
+  update-league-table:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 */6 * * *' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Call update-league-table endpoint
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.JOB_SECRET }}" \
+            -H "Content-Type: application/json" \
+            https://prempredictor-pz93.onrender.com/api/jobs/update-league-table
+
+  refresh-cache:
+    runs-on: ubuntu-latest
+    if: always()  # Run on all schedules and manual triggers
+    needs: [update-match-data, update-league-table]  # Run after data updates when they run
+    steps:
+      - name: Call refresh-cache endpoint
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.JOB_SECRET }}" \
+            -H "Content-Type: application/json" \
+            https://prempredictor-pz93.onrender.com/api/jobs/refresh-cache
