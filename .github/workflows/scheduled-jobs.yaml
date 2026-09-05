@@ -11,34 +11,83 @@ on:
 jobs:
   update-match-data:
     runs-on: ubuntu-latest
+    # Only run on 6-hour schedule (0 */6 * * *) or manual trigger
     if: github.event.schedule == '0 */6 * * *' || github.event_name == 'workflow_dispatch'
     steps:
-      - name: Call update-match-data endpoint
-        run: |
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.JOB_SECRET }}" \
-            -H "Content-Type: application/json" \
-            https://prempredictor-pz93.onrender.com/api/jobs/update-match-data
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Update match data
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+          PLP_CURRENT_SEASON: ${{ secrets.PLP_CURRENT_SEASON }}
+        run: python scripts/jobs/update_match_data.py
 
   update-league-table:
     runs-on: ubuntu-latest
+    # Only run on 6-hour schedule (0 */6 * * *) or manual trigger
     if: github.event.schedule == '0 */6 * * *' || github.event_name == 'workflow_dispatch'
     steps:
-      - name: Call update-league-table endpoint
-        run: |
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.JOB_SECRET }}" \
-            -H "Content-Type: application/json" \
-            https://prempredictor-pz93.onrender.com/api/jobs/update-league-table
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Update league table
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+          PLP_CURRENT_SEASON: ${{ secrets.PLP_CURRENT_SEASON }}
+        run: python scripts/jobs/update_league_table.py
 
   refresh-cache:
     runs-on: ubuntu-latest
     if: always()  # Run on all schedules and manual triggers
     needs: [update-match-data, update-league-table]  # Run after data updates when they run
     steps:
-      - name: Call refresh-cache endpoint
-        run: |
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.JOB_SECRET }}" \
-            -H "Content-Type: application/json" \
-            https://prempredictor-pz93.onrender.com/api/jobs/refresh-cache
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Refresh cache
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          PLP_DEFAULT_SIMULATIONS: ${{ secrets.PLP_DEFAULT_SIMULATIONS }}
+        run: python scripts/jobs/refresh_cache.py
