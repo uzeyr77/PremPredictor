@@ -43,4 +43,45 @@ def create_app() -> Flask:
         except (ValueError, TypeError, AttributeError):
             return value
 
+    @app.template_filter("formatKickoff")
+    def format_kickoff(value: str) -> str:
+        """Format ISO timestamp to local kickoff time (e.g., '10:00 AM')."""
+        try:
+            if isinstance(value, str):
+                # Parse ISO 8601 datetime (2026-09-12T14:00:00Z)
+                dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            elif isinstance(value, datetime):
+                dt = value
+            else:
+                return value
+            # Return time in 12-hour format with AM/PM (Windows-compatible)
+            time_str = dt.strftime("%I:%M %p")
+            # Remove leading zero from hour manually for cross-platform compatibility
+            if time_str[0] == "0":
+                time_str = time_str[1:]
+            return time_str
+        except (ValueError, TypeError, AttributeError):
+            return value
+
+    @app.template_filter("formatDayHeader")
+    def format_day_header(value: str) -> str:
+        """Format ISO timestamp to day header (e.g., 'Saturday, September 12')."""
+        try:
+            if isinstance(value, str):
+                # Parse ISO 8601 datetime (2026-09-12T14:00:00Z)
+                dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            elif isinstance(value, datetime):
+                dt = value
+            else:
+                return value
+            # Return full weekday, month, day (Windows-compatible)
+            day_str = dt.strftime("%A, %B %d")
+            # Remove leading zero from day manually for cross-platform compatibility
+            parts = day_str.rsplit(" ", 1)
+            if len(parts) == 2 and parts[1].startswith("0"):
+                day_str = parts[0] + " " + parts[1].lstrip("0")
+            return day_str
+        except (ValueError, TypeError, AttributeError):
+            return value
+
     return app

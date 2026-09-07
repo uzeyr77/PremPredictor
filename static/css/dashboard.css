@@ -4,9 +4,10 @@
 
 :root {
   /* ── Typography ── */
-  /* Geist: sharp, confident, technical — matches editorial sports analytics */
-  --font:      'Geist', system-ui, -apple-system, sans-serif;
-  --mono:      'Geist Mono', ui-monospace, 'SF Mono', monospace;
+  /* Oswald: condensed sports headline type (broadcast scoreboards) */
+  /* IBM Plex Mono: tabular mono for computed output (stat sheets) */
+  --font:      'Oswald', system-ui, -apple-system, sans-serif;
+  --mono:      'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
 
   /* Fixed rem scale (1.25 ratio) — dashboard UI, not marketing */
   /* 5-step scale with clear hierarchy: xs, sm, base, lg, xl, 2xl, 3xl */
@@ -29,53 +30,44 @@
   --tracking-label:    -0.02em;  /* section labels — TIGHT, not wide! */
   --tracking-data:     0.05em;   /* data micro-labels only */
 
-  /* Font weights */
-  --weight-normal:   400;
-  --weight-medium:   500;
-  --weight-semibold: 600;
-  --weight-bold:     700;
-  --weight-black:    800;
+  /* Font weights (Oswald: 500/600/700; IBM Plex Mono: 500/600) */
+  --weight-normal:   400;  /* fallback only */
+  --weight-medium:   500;  /* Oswald/IBM Plex Mono */
+  --weight-semibold: 600;  /* Oswald/IBM Plex Mono */
+  --weight-bold:     700;  /* Oswald */
+  --weight-black:    700;  /* map to bold for Oswald */
 
   /* ── Surfaces ── */
-  /* Purple-tinted neutrals (Premier League association) */
-  --bg:             oklch(10% 0.015 280);
-  --surface:        oklch(14% 0.012 280);
-  --surface-raised: oklch(18% 0.010 280);
-  --surface-strong: oklch(22% 0.008 280);
-  --border:         oklch(30% 0.005 280 / 0.25);
-  --border-hover:   oklch(40% 0.005 280 / 0.35);
+  /* Near-black neutral, NO hue tint (design-revamp.md spec) */
+  --bg:             oklch(10% 0 0);
+  --surface:        oklch(14% 0 0);
+  --surface-raised: oklch(18% 0 0);
+  --surface-strong: oklch(22% 0 0);
+  --border:         oklch(30% 0 0 / 0.25);
+  --border-hover:   oklch(40% 0 0 / 0.35);
 
   /* ── Text hierarchy ── */
-  --text-primary:   oklch(92% 0.005 280);
-  --text-secondary: oklch(65% 0.010 280);
-  --text-muted:     oklch(45% 0.008 280);
-  --text-disabled:  oklch(32% 0.005 280);
+  /* PRIMARY TEXT: 90%+ lightness for 15:1+ contrast (design-revamp2.0.md spec) */
+  --text:           oklch(95% 0 0);     /* #F2F2F0 equivalent - near-white for primary text */
+  /* SECONDARY TEXT: must clear 4.5:1 contrast minimum (WCAG AA) */
+  --text-dim:       oklch(62% 0 0);     /* #9C9C9E equivalent - for tertiary text ONLY */
 
-  /* ── Accent ── */
-  /* Refined: increased chroma from 0.010 to 0.16 for better visibility */
-  --accent:         oklch(75% 0.16 280);
-  --accent-hover:   oklch(80% 0.18 280);
-  --accent-active:  oklch(70% 0.14 280);
-  --accent-soft:    oklch(75% 0.16 280 / 0.12);
+  /* ── Functional colors — one meaning per color, used identically sitewide ── */
+  --green:          oklch(60% 0.18 140);  /* pitch green: positive, home win, qualification, W form, UCL zone */
+  --red:            oklch(55% 0.20 25);   /* muted red: negative, loss, relegation, L form */
+  --gold:           oklch(70% 0.16 85);   /* muted amber: title race leader ONLY */
+  --blue:           oklch(60% 0.14 240);  /* muted blue: top-four/UCL zone (replaces violet) */
+  --gray:           oklch(55% 0 0);       /* neutral: draws (D form) */
 
-  /* ── Semantic colors — Premier League standard (UEFA competition colors) ── */
-  --positive:       oklch(72% 0.21 145);  /* Champions League green (top-4) */
-  --positive-soft:  oklch(72% 0.21 145 / 0.15);
-  --warning:        oklch(78% 0.20 85);   /* Europa League gold (title race) */
-  --warning-soft:   oklch(78% 0.20 85 / 0.15);
-  --negative:       oklch(62% 0.23 25);   /* relegation red */
-  --negative-soft:  oklch(62% 0.23 25 / 0.15);
-  --neutral:        oklch(58% 0.04 280);  /* draws (muted purple-grey) */
-
-  /* Zone backgrounds — based on semantic colors */
-  --zone-title-bg:  oklch(78% 0.20 85 / 0.12);   /* from warning (Europa gold) */
-  --zone-top4-bg:   oklch(72% 0.21 145 / 0.12);  /* from positive (UCL green) */
-  --zone-eu-bg:     oklch(75% 0.16 280 / 0.12);  /* accent */
-  --zone-releg-bg:  oklch(62% 0.23 25 / 0.12);   /* from negative */
-
-  /* Additional semantic colors */
-  --ucl:            oklch(65% 0.15 260);
-  --ucl-bg:         oklch(65% 0.15 260 / 0.10);
+  /* Legacy aliases for compatibility - will remove during layout refactor */
+  --positive:       var(--green);
+  --negative:       var(--red);
+  --warning:        var(--gold);
+  --accent:         var(--blue);
+  --neutral:        var(--gray);
+  --text-primary:   var(--text);
+  --text-secondary: var(--text);
+  --text-muted:     var(--text-dim);
 
   /* ── Spacing (4pt scale) ── */
   --sp-1:  4px;
@@ -110,7 +102,6 @@ html, body {
   line-height: var(--leading-normal);
   letter-spacing: var(--tracking-normal);
   -webkit-font-smoothing: antialiased;
-  font-feature-settings: 'ss01' on, 'cv01' on; /* Geist stylistic alternates */
   overflow-x: clip; /* prevent horizontal scroll */
 }
 
@@ -125,7 +116,6 @@ body {
 .mono {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'ss01' on;
 }
 
 /* ── Typography utilities ── */
@@ -149,12 +139,12 @@ body {
 .leading-tight   { line-height: var(--leading-tight); }
 .leading-relaxed { line-height: var(--leading-relaxed); }
 
-/* Labels and eyebrows — uppercase, TIGHT tracking (design.md anti-AI-tell) */
+/* Labels — sentence case, NO uppercase (avoids AI eyebrow pattern) */
 .label {
   font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
   color: var(--text-muted);
 }
 
@@ -195,9 +185,10 @@ body {
 }
 .dash-clock {
   font-size: var(--text-sm);
-  color: var(--text-muted);
-  font-weight: 400;  /* design.md: timestamps are regular weight */
-  letter-spacing: 0;  /* design.md: timestamps use normal spacing, NOT wide */
+  font-family: var(--mono);  /* timestamps in mono */
+  color: var(--text);  /* functional text uses primary */
+  font-weight: 500;
+  letter-spacing: 0;
   padding-top: 6px;
 }
 
@@ -251,25 +242,33 @@ body {
   outline-offset: 2px;
 }
 
-/* Feature cards — stronger background tints with colored numbers */
-.fc--motw  { background: var(--zone-top4-bg); border-color: oklch(72% 0.21 145 / 0.2); }
-.fc--title { background: var(--zone-title-bg); border-color: oklch(78% 0.20 85 / 0.2); }
-.fc--ucl   { background: var(--ucl-bg); border-color: var(--accent); }
-.fc--releg { background: var(--zone-releg-bg); border-color: oklch(62% 0.23 25 / 0.2); }
+/* Feature cards — subtle background tints, NO colored borders (AI slop pattern) */
+.fc--motw  { background: var(--zone-top4-bg); }
+.fc--title { background: var(--zone-title-bg); }
+.fc--ucl   { background: var(--ucl-bg); }
+.fc--releg { background: var(--zone-releg-bg); }
 
 .fc--motw  .fc-big-number { color: var(--positive); }
 .fc--title .fc-big-number { color: var(--warning); }
 .fc--ucl   .fc-big-number { color: var(--accent); }
 .fc--releg .fc-big-number { color: var(--negative); }
 
-.fc-eyebrow {
-  font-size: var(--text-xs);
+/* Fix gray text on colored backgrounds — use tinted shades instead */
+.fc--motw  .fc-foot span { color: oklch(60% 0.12 145); }
+.fc--title .fc-foot span { color: oklch(62% 0.12 85); }
+.fc--ucl   .fc-foot span { color: oklch(60% 0.10 240); }
+.fc--releg .fc-foot span { color: oklch(58% 0.14 25); }
+
+.fc-heading {
+  font-size: var(--text-sm);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: var(--sp-2);
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
+  color: var(--text-primary);
+  margin: 0 0 var(--sp-2) 0;
 }
+
+/* Legacy .fc-eyebrow removed - AI anti-pattern (design-revamp2.0.md) */
 
 .fc-big-number {
   font-size: var(--text-3xl);
@@ -306,14 +305,14 @@ body {
 
 .fc-badge-pill {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 20px;
-  background: var(--surface-raised);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text-secondary);
   font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-data);
-  text-transform: uppercase;
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
   margin-top: var(--sp-1);
 }
 
@@ -358,9 +357,9 @@ body {
 
 .sc-label {
   font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
   color: var(--text-muted);
   margin-bottom: var(--sp-2);
 }
@@ -427,32 +426,32 @@ body {
 
 .panel-head h2 {
   margin: 0;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--text-secondary);
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
+  color: var(--text-primary);
 }
 
 .panel-head .hint {
   font-size: var(--text-sm);
-  color: var(--text-muted);
-  font-weight: 400;  /* design.md: regular weight, NOT 500/600 */
+  color: var(--text);  /* use primary text, not dim */
+  font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
 }
 
 .panel-head a {
   font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+  color: var(--text);  /* links use primary text, never dim */
   text-decoration: none;
   flex-shrink: 0;
   transition: color var(--dur-short) var(--ease-out);
 }
 
 .panel-head a:hover {
-  color: var(--text-primary);
+  color: var(--blue);  /* hover to accent color */
 }
 
 .panel-head a:focus-visible {
@@ -481,76 +480,189 @@ body {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--text-sm);
+  table-layout: fixed;
 }
 
 .standings-table th {
   text-align: left;
-  padding: 0 var(--sp-3);
-  height: 32px;
+  padding: 10px 16px;
+  height: 40px;
   font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--text-muted);
-  background: var(--surface-raised);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
+  color: var(--text-secondary);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .standings-table th.r { text-align: right; }
 
+/* Optimized column widths for data density */
+.standings-table th:nth-child(1) { width: 40px; text-align: right; }  /* # */
+.standings-table th:nth-child(2) { width: 36px; padding: 10px 8px; }   /* Crest */
+.standings-table th:nth-child(3) { width: auto; min-width: 140px; }   /* Team name */
+.standings-table th:nth-child(4) { width: 52px; }  /* Pts */
+.standings-table th:nth-child(5) { width: 56px; }  /* Proj */
+.standings-table th:nth-child(6) { width: 64px; }  /* Title */
+.standings-table th:nth-child(7) { width: 68px; }  /* Top 4 */
+
 .standings-table td {
-  padding: 7px var(--sp-3);
-  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  border-bottom: none; /* FotMob style: NO borders between rows */
+  vertical-align: middle;
 }
 
 .standings-table td.r { text-align: right; }
 
-.standings-table tr:last-child td { border-bottom: 0; }
+.standings-table tbody tr {
+  transition: background var(--dur-short) var(--ease-out);
+}
 
-.standings-table tbody tr:hover td { background: var(--surface-raised); }
+/* FotMob style: hover-only highlights, no persistent zone backgrounds */
+.standings-table tbody tr:hover {
+  background: var(--surface-raised);
+}
 
 .standings-table .sep td {
   padding: 0 var(--sp-3);
   height: 26px;
   text-align: center;
   font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
   color: var(--text-muted);
   background: var(--surface-raised);
 }
 
-.th-crest,
-.td-crest { width: 32px; padding: 4px 4px 4px 12px; }
+.th-crest { width: 32px; padding: 8px 4px; }
+.td-crest { width: 32px; padding: 10px 4px; vertical-align: middle; }
 
-/* Zone indicators — stronger background tints */
-.zone-title { background: var(--zone-title-bg); }
-.zone-top4  { background: var(--zone-top4-bg); }
-.zone-eu    { background: var(--zone-eu-bg); }
-.zone-releg { background: var(--zone-releg-bg); }
-
-/* Hover states gain subtle color */
-.zone-title:hover { background: oklch(78% 0.20 85 / 0.18); }
-.zone-top4:hover  { background: oklch(72% 0.21 145 / 0.18); }
-.zone-eu:hover    { background: oklch(75% 0.16 280 / 0.18); }
-.zone-releg:hover { background: oklch(62% 0.23 25 / 0.18); }
-
-.c-green { color: var(--positive); }
-.c-gold  { color: var(--warning); }
-.c-red   { color: var(--negative); }
-.c-muted { color: var(--text-muted); }
-
-/* ── Fixture cards ── */
-.fixture-card {
-  padding: var(--sp-3) var(--sp-4);
-  border-bottom: 1px solid var(--border);
-  transition: background var(--dur-short) var(--ease-out),
-              box-shadow var(--dur-short) var(--ease-out);
+/* Zone indicators — FotMob style: thin colored stripe on position cell */
+.zone-title .td-pos::before,
+.zone-top4 .td-pos::before,
+.zone-eu .td-pos::before,
+.zone-releg .td-pos::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
 }
 
-.fixture-card:last-child { border-bottom: 0; }
-.fixture-card:hover { background: var(--surface-raised); }
+.zone-title .td-pos { position: relative; }
+.zone-title .td-pos::before { background: oklch(78% 0.20 85); } /* Title - gold */
+
+.zone-top4 .td-pos { position: relative; }
+.zone-top4 .td-pos::before { background: oklch(72% 0.21 145); } /* UCL - green */
+
+.zone-eu .td-pos { position: relative; }
+.zone-eu .td-pos::before { background: oklch(65% 0.12 240); } /* Europa - steel blue */
+
+.zone-releg .td-pos { position: relative; }
+.zone-releg .td-pos::before { background: oklch(62% 0.23 25); } /* Relegation - red */
+
+/* Hover highlights */
+.zone-title:hover { background: oklch(78% 0.20 85 / 0.08); }
+.zone-top4:hover  { background: oklch(72% 0.21 145 / 0.08); }
+.zone-eu:hover    { background: oklch(65% 0.12 240 / 0.08); }
+.zone-releg:hover { background: oklch(62% 0.23 25 / 0.08); }
+
+/* Removed color utility classes - FotMob style uses consistent white text for data */
+/* Only use semantic colors for actual colored elements like badges, not table data */
+
+/* ── Redesigned fixture rows (match-fixture-redesign.md) ── */
+.fixture-card-horizontal {
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  transition: background var(--dur-short) var(--ease-out);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.fixture-card-horizontal:last-child {
+  border-bottom: none;
+}
+
+.fixture-card-horizontal:hover {
+  background: var(--surface-raised);
+}
+
+/* Top tier: centered badge | time | badge */
+.fix-h-badges-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  justify-content: center;
+}
+
+.fix-h-time {
+  font-size: var(--text-sm);
+  color: var(--text);
+  font-weight: var(--weight-bold);
+  font-family: var(--mono);
+  min-width: 70px;
+  text-align: center;
+}
+
+/* Bottom tier: probability module */
+.fix-h-prob-module {
+  width: 100%;
+  max-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Percentages above bar */
+.fix-h-pcts {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  font-family: var(--mono);
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+/* Probability bar */
+.fix-h-bar {
+  display: flex;
+  height: 5px;
+  border-radius: 99px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.fix-h-bar .h { background: var(--positive); }
+.fix-h-bar .d { background: var(--neutral); }
+.fix-h-bar .a { background: var(--negative); opacity: 0.7; }
+
+/* xG below bar */
+.fix-h-xg {
+  font-size: var(--text-xs);
+  font-family: var(--mono);
+  color: var(--text);
+  text-align: center;
+  margin-top: 2px;
+}
+
+/* ── Legacy fixture cards (old style) ── */
+.fixture-card {
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: none;
+  transition: background var(--dur-short) var(--ease-out);
+}
+
+.fixture-card:hover {
+  background: var(--surface-raised);
+}
 
 .fixture-card .top {
   display: flex;
@@ -561,10 +673,11 @@ body {
 
 .fixture-card .date {
   font-size: var(--text-xs);
-  color: var(--text-muted);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
+  color: var(--text);  /* functional text uses primary, not dim */
+  font-weight: var(--weight-medium);
+  font-family: var(--mono);  /* dates/times in mono */
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
 }
 
 .fixture-card .pick {
@@ -596,14 +709,14 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--text-secondary);
-  font-weight: var(--weight-medium);
+  color: var(--text-primary); /* FotMob: white, not grey */
+  font-weight: var(--weight-semibold);
   overflow-wrap: anywhere; /* gate 51 */
 }
 
 .fixture-row--fav .team-name {
   color: var(--text-primary);
-  font-weight: var(--weight-bold);
+  font-weight: var(--weight-semibold);
 }
 
 .fixture-row .pct {
@@ -634,14 +747,15 @@ body {
 .fixture-xg {
   margin-top: var(--sp-1);
   font-size: var(--text-xs);
-  color: var(--text-muted);
+  font-family: var(--mono);  /* xG values in mono */
+  color: var(--text);  /* functional data uses primary text */
 }
 
 .fx-tag {
   font-size: 0.5625rem; /* 9px — smaller than xs for compact tags */
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-data);
-  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
   padding: 2px 6px;
   border-radius: 4px;
   flex-shrink: 0;
@@ -772,10 +886,10 @@ body {
   border-color: var(--border-hover);
 }
 
-/* Race cards — stronger background tints with colored borders */
-.critical-card.race-title { background: var(--zone-title-bg); border-color: oklch(78% 0.20 85 / 0.25); }
-.critical-card.race-top4  { background: var(--zone-top4-bg); border-color: oklch(72% 0.21 145 / 0.25); }
-.critical-card.race-releg { background: var(--zone-releg-bg); border-color: oklch(62% 0.23 25 / 0.25); }
+/* Race cards — subtle background tints, NO colored borders (AI slop pattern) */
+.critical-card.race-title { background: var(--zone-title-bg); }
+.critical-card.race-top4  { background: var(--zone-top4-bg); }
+.critical-card.race-releg { background: var(--zone-releg-bg); }
 
 .critical-card .swing {
   font-size: var(--text-lg);
@@ -808,9 +922,9 @@ body {
 
 .critical-card .race-label {
   font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
   color: var(--text-muted);
   margin-top: var(--sp-1);
 }
@@ -843,10 +957,17 @@ body {
   border-radius: var(--radius-sm);
   position: relative;
   overflow: hidden;
-  background: oklch(95% 0.005 280) !important;
+  background: transparent; /* FotMob style: transparent, no white backgrounds */
 }
 
+/* Use team colors for crest backgrounds - NOT white */
+.crest[data-color] {
+  background: transparent; /* Keep transparent like FotMob */
+}
+
+.crest-hero { width: 68px; height: 68px; border-radius: 10px; } /* Featured match: 64-72px range */
 .crest-lg { width: 52px; height: 52px; border-radius: 10px; }
+.crest-md { width: 34px; height: 34px; border-radius: 6px; } /* Fixture rows: 32-36px range */
 .crest-sm { width: 20px; height: 20px; }
 .crest-xs { width: 18px; height: 18px; border-radius: 4px; }
 
@@ -864,12 +985,14 @@ body {
 
 .crest-txt {
   font-weight: var(--weight-black);
-  color: oklch(30% 0.005 280);
+  color: var(--text-primary); /* FotMob: visible fallback text */
   position: relative;
   z-index: 1;
 }
 
+.crest-hero .crest-txt { font-size: var(--text-sm); }
 .crest-lg .crest-txt { font-size: var(--text-xs); }
+.crest-md .crest-txt { font-size: 0.625rem; } /* 10px */
 .crest-sm .crest-txt { font-size: 0.5rem; }
 .crest-xs .crest-txt { font-size: 0.4375rem; }
 
@@ -882,6 +1005,40 @@ body {
 
 .empty--compact {
   padding: var(--sp-2) var(--sp-3);
+}
+
+/* ── Basecoat-style buttons (match-fixture-redesign.md section 3) ── */
+.btn-outline,
+.btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  font-family: var(--font);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--dur-short) var(--ease-out),
+              border-color var(--dur-short) var(--ease-out),
+              color var(--dur-short) var(--ease-out);
+}
+
+.btn-outline:hover,
+.btn-sm:hover {
+  background: var(--surface-raised);
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.btn-outline:active,
+.btn-sm:active {
+  transform: translateY(1px);
 }
 
 /* ── Animations ── */
@@ -904,6 +1061,88 @@ body {
 .stat-card:nth-child(2) { animation: fadeUp var(--dur-base) var(--ease-out) both 0.12s; }
 .stat-card:nth-child(3) { animation: fadeUp var(--dur-base) var(--ease-out) both 0.16s; }
 .stat-card:nth-child(4) { animation: fadeUp var(--dur-base) var(--ease-out) both 0.20s; }
+
+/* ── Loading skeleton states ── */
+/* Bloomberg-style loading: structure visible, data fills in */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface) 0%,
+    var(--surface-raised) 50%,
+    var(--surface) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  border-radius: 4px;
+  color: transparent;
+  user-select: none;
+  pointer-events: none;
+}
+
+.skeleton-text {
+  background: var(--surface-raised);
+  border-radius: 3px;
+  display: inline-block;
+  height: 1em;
+  vertical-align: middle;
+}
+
+/* Skeleton widths for different data types */
+.skeleton-text--short { width: 3ch; }   /* Numbers like "23" */
+.skeleton-text--medium { width: 8ch; }  /* Team names */
+.skeleton-text--long { width: 15ch; }   /* Full sentences */
+.skeleton-text--pct { width: 5ch; }     /* Percentages like "45.2%" */
+
+@keyframes skeleton-pulse {
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 100% 0%; }
+}
+
+/* Loading state for feature cards */
+.feature-card.is-loading .fc-big-number,
+.feature-card.is-loading .fc-teams,
+.stat-card.is-loading .sc-value {
+  color: transparent;
+  background: var(--surface-raised);
+  border-radius: 4px;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* Loading state for table rows */
+.standings-table.is-loading td {
+  color: transparent;
+  background: var(--surface-raised);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* ── Comprehensive focus-visible states ── */
+/* Apply consistent focus styling across all interactive elements */
+button:focus-visible,
+a:focus-visible,
+[tabindex="0"]:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Tab-specific focus (for keyboard navigation) */
+.form-tabs button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Table row keyboard navigation */
+.standings-table tbody tr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Pill nav links */
+.pill-nav-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
@@ -932,8 +1171,45 @@ body {
 @media (max-width: 640px) {
   .dashboard { padding: var(--sp-3); }
   .feature-cards { grid-template-columns: 1fr; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid { grid-template-columns: 1fr; } /* Single column on mobile for better readability */
   .critical-panel-body { grid-template-columns: repeat(2, 1fr); }
+
+  /* Mobile standings optimization: prioritize key data */
+  .standings-table {
+    font-size: 0.8125rem; /* 13px */
+  }
+
+  .standings-table th {
+    padding: 8px 8px;
+    font-size: 0.6875rem; /* 11px */
+  }
+
+  .standings-table td {
+    padding: 8px 8px;
+  }
+
+  /* Hide projected points on mobile - show only current */
+  .standings-table th:nth-child(5), /* Proj header */
+  .standings-table td:nth-child(5) {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  /* On very small screens, hide title probability column too */
+  .standings-table th:nth-child(6), /* Title % header */
+  .standings-table td:nth-child(6) {
+    display: none;
+  }
+
+  /* Reduce font size for remaining columns */
+  .standings-table {
+    font-size: 0.8125rem; /* 13px - slightly smaller for readability */
+  }
+
+  .standings-table th {
+    font-size: 0.6875rem; /* 11px for headers */
+  }
 }
 
 @media (max-width: 414px) {
