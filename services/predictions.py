@@ -1444,12 +1444,33 @@ def build_rich_projected_table(
     top4_probs = simulation_result["top_4_probabilities"]
     releg_probs = simulation_result["relegation_probabilities"]
 
+    # Get form data (last 3 matches)
+    form_series = get_recent_form(repo, n=3)
+
+    # Get next opponent for each team
+    remaining = get_remaining_matches(repo)
+    remaining_sorted = remaining.sort_values(['matchweek', 'date'])
+    next_opponent = {}
+    for team in projected.iloc[:, 0]:
+        team_matches = remaining_sorted[
+            (remaining_sorted['home_team'] == team) | (remaining_sorted['away_team'] == team)
+        ]
+        if not team_matches.empty:
+            next_match = team_matches.iloc[0]
+            next_opponent[team] = next_match['away_team'] if next_match['home_team'] == team else next_match['home_team']
+
     rows = []
     for _, row in projected.iterrows():
         team = row.iloc[0]
         proj_raw = row.iloc[1]
         proj_pts = int(round(float(proj_raw))) if pd.notna(proj_raw) else 0
         position = int(row.iloc[2])
+
+        # Get form results
+        form_results = form_series.get(team, [])
+        if isinstance(form_results, pd.Series):
+            form_results = form_results.tolist()
+
         rows.append(
             {
                 "position": position,
@@ -1459,6 +1480,8 @@ def build_rich_projected_table(
                 "title_probability": float(title_probs.get(team, 0.0)),
                 "top_4_probability": float(top4_probs.get(team, 0.0)),
                 "relegation_probability": float(releg_probs.get(team, 0.0)),
+                "form": list(form_results),
+                "next_opponent": next_opponent.get(team),
             }
         )
 

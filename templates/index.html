@@ -9,13 +9,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
   <style>
-    /* ── Breadcrumb ── */
-    .breadcrumb-trail {
-      font-size: var(--text-xs);
+    /* ── Page title (simplified single-line) ── */
+    .page-title {
+      font-size: var(--text-sm);
       letter-spacing: var(--tracking-normal);
       text-transform: none;
-      color: var(--text-muted);
-      margin: 0 0 6px;
+      color: var(--text);
+      margin: 0;
       font-weight: var(--weight-medium);
     }
 
@@ -165,6 +165,37 @@
     .zone-legend-item { display: flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--text-secondary); font-weight: var(--weight-medium); }
     .zone-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 
+    /* ── Form squares (league table) ── */
+    .table-form { display: flex; gap: 4px; justify-content: flex-end; }
+    .form-square {
+      width: 22px; height: 22px; border-radius: 5px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; font-weight: var(--weight-bold);
+      color: oklch(100% 0 0);
+    }
+    .form-square.W { background: var(--green); }
+    .form-square.D { background: var(--gray); }
+    .form-square.L { background: var(--red); }
+    .form-square.W.latest { box-shadow: 0 2px 0 0 var(--green); }
+    .form-square.D.latest { box-shadow: 0 2px 0 0 var(--gray); }
+    .form-square.L.latest { box-shadow: 0 2px 0 0 var(--red); }
+
+    /* ── Next opponent crest (smaller than row crest) ── */
+    .crest-next {
+      width: 20px; height: 20px;
+      display: inline-flex;
+      align-items: center; justify-content: center;
+      border-radius: 4px;
+      background: var(--surface-raised);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .crest-next .crest-img { width: 16px; height: 16px; object-fit: contain; }
+    .crest-next .crest-txt {
+      font-size: 0.5rem; font-weight: var(--weight-bold);
+      letter-spacing: var(--tracking-tight);
+    }
+
     /* ── Table overrides ── */
     .td-pos {
       width: 36px;
@@ -189,41 +220,37 @@
     }
     .fc--motw .fc-teams { font-size: var(--text-base); font-weight: var(--weight-bold); margin-top: var(--sp-2); }
 
-    /* ── Pill Navigation ── */
-    .pill-nav {
+    /* ── Tab Navigation (Basecoat-style) ── */
+    .tabs-nav {
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+
+    .tab-bar {
       display: flex;
-      justify-content: center;
-      padding: var(--sp-4) 0;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 var(--sp-4);
     }
 
-    .pill-nav-inner {
-      display: inline-flex;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 4px;
-    }
-
-    .pill-nav-link {
-      padding: var(--sp-2) var(--sp-4);
-      border-radius: 999px;
+    .tab-link {
+      padding: var(--sp-3) var(--sp-4);
       font-size: var(--text-sm);
       font-weight: var(--weight-semibold);
-      color: var(--text-secondary);
+      color: var(--text-muted);
       text-decoration: none;
-      min-width: 120px;
-      text-align: center;
-      transition: background 0.15s, color 0.15s;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      letter-spacing: var(--tracking-normal);
     }
 
-    .pill-nav-link:hover {
-      background: var(--surface-raised);
-      color: var(--text-primary);
+    .tab-link:hover {
+      color: var(--text);
     }
 
-    .pill-nav-link.active {
-      background: var(--accent);
-      color: var(--bg);
+    .tab-link.active {
+      color: var(--text);
+      border-bottom-color: var(--text);
     }
 
     .site-main {
@@ -238,8 +265,8 @@
       .hero-centre { min-width: unset; width: 100%; }
     }
     @media (max-width: 768px) {
-      .pill-nav { padding: var(--sp-3) var(--sp-2); }
-      .pill-nav-link { min-width: 100px; padding: var(--sp-2) var(--sp-3); }
+      .tab-bar { padding: 0 var(--sp-2); }
+      .tab-link { padding: var(--sp-2) var(--sp-3); }
     }
     @media (max-width: 640px) { .hero-stakes { flex-direction: column; gap: var(--sp-3); } }
   </style>
@@ -343,22 +370,23 @@
   'Wolverhampton Wanderers': 'https://resources.premierleague.com/premierleague/badges/100/t39.png'
 } %}
 
-<nav class="pill-nav">
-  <div class="pill-nav-inner">
-    <a href="{{ url_for('dashboard.dashboard_page') }}" class="pill-nav-link active">Dashboard</a>
-    <a href="{{ url_for('scenario.scenario_page') }}" class="pill-nav-link">Scenarios</a>
-  </div>
-</nav>
+<div class="tabs-nav">
+  <nav role="tablist" aria-orientation="horizontal" class="tab-bar">
+    <a href="{{ url_for('dashboard.dashboard_page') }}" role="tab" aria-selected="true" class="tab-link active">
+      Overview
+    </a>
+    <a href="{{ url_for('scenario.scenario_page') }}" role="tab" aria-selected="false" class="tab-link">
+      Scenarios
+    </a>
+  </nav>
+</div>
 
 <div class="site-main">
 <div class="dashboard">
 
   {# ── Page header ── #}
   <div class="dash-header">
-    <div class="dash-greeting">
-      <p class="breadcrumb-trail">Dashboard · GW{{ meta.matchweek if meta else '—' }}</p>
-      <h1>Season <strong>{{ meta.season_label if meta else '2026/27' }}</strong></h1>
-    </div>
+    <p class="page-title">Overview · Gameweek {{ meta.matchweek if meta else '—' }} · {{ meta.season_label if meta else '2026/27' }}</p>
     <div class="dash-clock" id="js-clock" aria-live="polite"></div>
   </div>
 
@@ -520,13 +548,15 @@
                 <th class="r" title="Projected final points">Proj</th>
                 <th class="r" title="Title probability">Title</th>
                 <th class="r" title="Top-4 probability">Top 4</th>
+                <th class="r" title="Recent form">Form</th>
+                <th class="r" title="Next opponent">Next</th>
               </tr>
             </thead>
             <tbody>
               {% for row in projected_table %}
                 {% if row.is_separator %}
                   <tr class="sep">
-                    <td colspan="7">{{ row.label }}</td>
+                    <td colspan="9">{{ row.label }}</td>
                   </tr>
                 {% else %}
                   {% if row.position == 1 %}
@@ -561,10 +591,27 @@
                         {{ (row.top_4_probability * 100) | round(0) | int }}%
                       {% else %}—{% endif %}
                     </td>
+                    <td class="r">
+                      <div class="table-form">
+                        {% if row.form %}
+                          {% for result in row.form %}
+                            <span class="form-square {{ result }}{% if loop.last %} latest{% endif %}">{{ result }}</span>
+                          {% endfor %}
+                        {% else %}—{% endif %}
+                      </div>
+                    </td>
+                    <td class="r">
+                      {% if row.next_opponent %}
+                        <span class="crest crest-next" data-color="{{ team_colors.get(row.next_opponent, '#1d2a48') }}">
+                          <img class="crest-img" src="{{ team_svg_logos.get(row.next_opponent, team_badge_urls.get(row.next_opponent, '')) }}" alt="{{ row.next_opponent }}" onerror="this.remove()">
+                          <span class="crest-txt">{{ row.next_opponent[:3] | upper }}</span>
+                        </span>
+                      {% else %}—{% endif %}
+                    </td>
                   </tr>
                 {% endif %}
               {% else %}
-                <tr><td colspan="7" class="empty">Projected standings update after simulations complete.</td></tr>
+                <tr><td colspan="9" class="empty">Projected standings update after simulations complete.</td></tr>
               {% endfor %}
             </tbody>
           </table>
